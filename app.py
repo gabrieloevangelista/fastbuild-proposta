@@ -32,6 +32,17 @@ st.set_page_config(
 
 LOGO_SAVED_PATH = os.path.join(tempfile.gettempdir(), "custom_company_logo.png")
 
+# ----------------------------------------------------------------- HTML Renderer Helper
+def render_html(html_str: str):
+    """
+    Renders raw HTML safely in Streamlit without triggering Markdown's code-block parser.
+    """
+    clean_html = " ".join(line.strip() for line in html_str.splitlines() if line.strip())
+    if hasattr(st, "html"):
+        st.html(clean_html)
+    else:
+        st.markdown(clean_html, unsafe_allow_html=True)
+
 # ----------------------------------------------------------------- CNPJ Auto-Complete Helper
 def fetch_cnpj_data(cnpj: str) -> dict:
     clean_cnpj = "".join(filter(str.isdigit, str(cnpj)))
@@ -94,8 +105,7 @@ def icon(name: str, size: int = 18, color: str = "currentColor") -> str:
     return icons.get(name, "")
 
 # ----------------------------------------------------------------- Custom CSS
-st.markdown(
-    textwrap.dedent("""
+render_html("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 
@@ -256,9 +266,7 @@ st.markdown(
         background: #0f766e;
     }
     </style>
-    """),
-    unsafe_allow_html=True,
-)
+""")
 
 # ----------------------------------------------------------------- Saved State & Settings Persistence
 if "saved_logo_path" not in st.session_state:
@@ -290,8 +298,7 @@ if st.session_state.get("saved_logo_path") and os.path.exists(st.session_state.s
 
 company_display_title = st.session_state.default_company.get("nome") or "Orça Rápido Monolítico"
 
-st.markdown(
-    textwrap.dedent(f"""
+render_html(f"""
     <div class="header-container">
         {logo_header_html}
         <div>
@@ -299,9 +306,7 @@ st.markdown(
             <div class="header-subtitle">Medição Vetorial de Paredes em Painéis EPS & Orçamentos Automatizados</div>
         </div>
     </div>
-    """),
-    unsafe_allow_html=True,
-)
+""")
 
 # Initialize Session State
 if "doc" not in st.session_state:
@@ -363,7 +368,7 @@ else:
 
 # ----------------------------------------------------------------- Tab 1: Planta & Medição
 def render_tab1():
-    st.markdown(f'<div class="card-title-html">{icon("upload", 18, "#0d9488")} Upload da Planta Baixa</div>', unsafe_allow_html=True)
+    render_html(f'<div class="card-title-html">{icon("upload", 18, "#0d9488")} Upload da Planta Baixa</div>')
     uploaded = st.file_uploader(
         "Selecione o arquivo da planta (.dwg ou .dxf)",
         type=["dwg", "dxf"],
@@ -406,7 +411,7 @@ def render_tab1():
 
     if st.session_state.summary:
         st.divider()
-        st.markdown(f'<div class="card-title-html">{icon("ruler", 18, "#0d9488")} Resumo da Medição Automatizada</div>', unsafe_allow_html=True)
+        render_html(f'<div class="card-title-html">{icon("ruler", 18, "#0d9488")} Resumo da Medição Automatizada</div>')
 
         total_confirmed = 0.0
         total_high_conf = 0.0
@@ -423,8 +428,7 @@ def render_tab1():
                 total_confirmed += st.session_state.confirmed.get(layer_name, r["paired_length_m"])
 
         # KPI Summary Grid
-        st.markdown(
-            textwrap.dedent(f"""
+        render_html(f"""
             <div class="kpi-grid">
                 <div class="kpi-card kpi-card-teal">
                     <div class="kpi-label">Metragem Total Confirmada</div>
@@ -439,11 +443,9 @@ def render_tab1():
                     <div class="kpi-value">{total_review:.2f} m</div>
                 </div>
             </div>
-            """),
-            unsafe_allow_html=True,
-        )
+        """)
 
-        st.markdown(f'<div class="card-title-html">{icon("file-cad", 18, "#0d9488")} Camadas de Parede Identificadas</div>', unsafe_allow_html=True)
+        render_html(f'<div class="card-title-html">{icon("file-cad", 18, "#0d9488")} Camadas de Parede Identificadas</div>')
         for layer_name, r in st.session_state.summary.items():
             is_rev = "REV" in layer_name.upper()
             badge_html = (
@@ -453,7 +455,7 @@ def render_tab1():
             )
 
             with st.expander(f"Layer: {layer_name}", expanded=True):
-                st.markdown(f"Tipo: {badge_html}", unsafe_allow_html=True)
+                render_html(f"Tipo: {badge_html}")
                 included = st.checkbox(
                     "Incluir no cálculo da proposta",
                     value=st.session_state.included.get(layer_name, True),
@@ -495,13 +497,10 @@ def render_tab2():
     col_a, col_b = st.columns(2)
 
     with col_a:
-        st.markdown(
-            textwrap.dedent(f"""
+        render_html(f"""
             <div class="custom-card">
                 <div class="card-title-html">{icon("building", 18, "#0d9488")} Empresa Contratada (Remetente)</div>
-            """),
-            unsafe_allow_html=True,
-        )
+        """)
         
         comp_cnpj_in = st.text_input("CNPJ da Empresa", value=st.session_state.get("comp_cnpj", ""), placeholder="00.000.000/0001-00", key="input_comp_cnpj")
         
@@ -528,16 +527,13 @@ def render_tab2():
         company_tel = st.text_input("Telefone", value=st.session_state.get("comp_tel", ""), placeholder="(11) 0000-0000", key="comp_tel")
         company_whatsapp = st.text_input("WhatsApp", value=st.session_state.get("comp_wsp", ""), placeholder="(11) 90000-0000", key="comp_wsp")
         company_email = st.text_input("E-mail comercial", value=st.session_state.get("comp_email", ""), placeholder="contato@empresa.com.br", key="comp_email")
-        st.markdown("</div>", unsafe_allow_html=True)
+        render_html("</div>")
 
     with col_b:
-        st.markdown(
-            textwrap.dedent(f"""
+        render_html(f"""
             <div class="custom-card">
                 <div class="card-title-html">{icon("user", 18, "#0d9488")} Cliente Contratante</div>
-            """),
-            unsafe_allow_html=True,
-        )
+        """)
         
         cli_doc_in = st.text_input("CPF / CNPJ do Cliente", value=st.session_state.get("cli_doc", ""), placeholder="00.000.000/0001-00", key="input_cli_doc")
         
@@ -561,17 +557,14 @@ def render_tab2():
         client_endereco = st.text_input("Endereço da obra", value=st.session_state.get("cli_end", ""), placeholder="Rua da Obra, 100 - São Paulo/SP", key="cli_end")
         client_tel = st.text_input("Telefone", value=st.session_state.get("cli_tel", ""), placeholder="(11) 99999-9999", key="cli_tel")
         client_email = st.text_input("E-mail", value=st.session_state.get("cli_email", ""), placeholder="cliente@email.com", key="cli_email")
-        st.markdown("</div>", unsafe_allow_html=True)
+        render_html("</div>")
 
 # ----------------------------------------------------------------- Tab 3: Condições & Gerar PDF
 def render_tab3():
-    st.markdown(
-        textwrap.dedent(f"""
+    render_html(f"""
         <div class="custom-card">
             <div class="card-title-html">{icon("terms", 18, "#0d9488")} Condições Comerciais</div>
-        """),
-        unsafe_allow_html=True,
-    )
+    """)
 
     col_c, col_d, col_e = st.columns(3)
     with col_c:
@@ -608,9 +601,9 @@ def render_tab3():
         placeholder="Ex: Instalação de painéis monolíticos EPS conforme especificações técnicas do fabricante.",
         key="comm_obs",
     )
-    st.markdown("</div>", unsafe_allow_html=True)
+    render_html("</div>")
 
-    st.markdown(f'<div class="card-title-html">{icon("pdf", 18, "#0d9488")} Emissão da Proposta em PDF</div>', unsafe_allow_html=True)
+    render_html(f'<div class="card-title-html">{icon("pdf", 18, "#0d9488")} Emissão da Proposta em PDF</div>')
 
     if st.button("Gerar Proposta Comercial em PDF", type="primary", use_container_width=True):
         if not st.session_state.summary:
@@ -693,16 +686,14 @@ def render_tab3():
 
 # ----------------------------------------------------------------- Tab 4: Configurações (Logo & Dados Padrão)
 def render_tab4():
-    st.markdown(
-        textwrap.dedent(f"""
+    render_html(f"""
         <div class="custom-card">
             <div class="card-title-html">{icon("gear", 18, "#0d9488")} Configurações da Empresa & Logotipo Padrão</div>
             <p style="font-size: 13px; color: #64748b;">
                 Cadastre o logotipo e os dados padrão da sua empresa. As informações salvas aqui serão pré-carregadas automaticamente em todas as novas propostas e impressas no PDF.
             </p>
-        """),
-        unsafe_allow_html=True,
-    )
+        </div>
+    """)
 
     col_logo1, col_logo2 = st.columns([1, 2])
     with col_logo1:
@@ -735,7 +726,7 @@ def render_tab4():
                 st.error(f"Erro ao salvar a imagem do logotipo: {e}")
 
     st.divider()
-    st.markdown('<div class="card-title-html">Dados Padrão da Empresa (Remetente)</div>', unsafe_allow_html=True)
+    render_html('<div class="card-title-html">Dados Padrão da Empresa (Remetente)</div>')
 
     cnpj_def_in = st.text_input(
         "CNPJ da Empresa",
@@ -796,8 +787,6 @@ def render_tab4():
         st.session_state["comp_email"] = def_email
 
         st.success("🎉 Configurações salvas com sucesso! Os dados padrão serão carregados em todas as propostas.")
-
-    st.markdown("</div>", unsafe_allow_html=True)
 
 # Render View Based on Active Tab
 if HAS_OPTION_MENU:
