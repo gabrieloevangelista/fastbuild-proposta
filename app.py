@@ -6,7 +6,6 @@ import os
 import tempfile
 import urllib.request
 import json
-import textwrap
 from PIL import Image
 
 import streamlit as st
@@ -32,16 +31,37 @@ st.set_page_config(
 
 LOGO_SAVED_PATH = os.path.join(tempfile.gettempdir(), "custom_company_logo.png")
 
-# ----------------------------------------------------------------- HTML Renderer Helper
-def render_html(html_str: str):
+# ----------------------------------------------------------------- Clean Custom CSS
+st.markdown(
     """
-    Renders raw HTML safely in Streamlit without triggering Markdown's code-block parser.
-    """
-    clean_html = " ".join(line.strip() for line in html_str.splitlines() if line.strip())
-    if hasattr(st, "html"):
-        st.html(clean_html)
-    else:
-        st.markdown(clean_html, unsafe_allow_html=True)
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
+    html, body, [class*="css"] {
+        font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+    }
+
+    .stApp {
+        background-color: #f8fafc;
+        color: #0f172a;
+    }
+
+    /* Primary Button Customization */
+    .stButton>button[kind="primary"] {
+        background: #0d9488;
+        border: none;
+        font-weight: 700;
+        box-shadow: 0 2px 8px rgba(13, 148, 136, 0.2);
+        border-radius: 8px;
+    }
+    
+    .stButton>button[kind="primary"]:hover {
+        background: #0f766e;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
 
 # ----------------------------------------------------------------- CNPJ Auto-Complete Helper
 def fetch_cnpj_data(cnpj: str) -> dict:
@@ -86,188 +106,6 @@ def fetch_cnpj_data(cnpj: str) -> dict:
         pass
     return {}
 
-# ----------------------------------------------------------------- SVG Outline Icons Helper
-def icon(name: str, size: int = 18, color: str = "currentColor") -> str:
-    icons = {
-        "file-cad": f'<svg xmlns="http://www.w3.org/2000/svg" width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" stroke="{color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 6px;"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><path d="M8 13h8"/><path d="M8 17h8"/><path d="M10 9h2"/></svg>',
-        "ruler": f'<svg xmlns="http://www.w3.org/2000/svg" width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" stroke="{color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 6px;"><path d="M21.3 15.3a2.4 2.4 0 0 1 0 3.4l-2.6 2.6a2.4 2.4 0 0 1-3.4 0L2.7 8.7a2.4 2.4 0 0 1 0-3.4l2.6-2.6a2.4 2.4 0 0 1 3.4 0l12.6 12.6z"/><path d="m14.5 12.5 2-2"/><path d="m11.5 9.5 2-2"/><path d="m8.5 6.5 2-2"/><path d="m17.5 15.5 2-2"/></svg>',
-        "building": f'<svg xmlns="http://www.w3.org/2000/svg" width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" stroke="{color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 6px;"><rect x="4" y="2" width="16" height="20" rx="2" ry="2"/><path d="M9 22v-4h6v4"/><path d="M8 6h.01"/><path d="M16 6h.01"/><path d="M12 6h.01"/><path d="M12 10h.01"/><path d="M12 14h.01"/><path d="M16 10h.01"/><path d="M16 14h.01"/><path d="M8 10h.01"/><path d="M8 14h.01"/></svg>',
-        "user": f'<svg xmlns="http://www.w3.org/2000/svg" width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" stroke="{color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 6px;"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>',
-        "terms": f'<svg xmlns="http://www.w3.org/2000/svg" width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" stroke="{color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 6px;"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 6v12"/></svg>',
-        "download": f'<svg xmlns="http://www.w3.org/2000/svg" width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" stroke="{color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 6px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>',
-        "check": f'<svg xmlns="http://www.w3.org/2000/svg" width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" stroke="{color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 4px;"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>',
-        "warning": f'<svg xmlns="http://www.w3.org/2000/svg" width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" stroke="{color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 4px;"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
-        "search": f'<svg xmlns="http://www.w3.org/2000/svg" width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" stroke="{color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 6px;"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>',
-        "upload": f'<svg xmlns="http://www.w3.org/2000/svg" width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" stroke="{color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 6px;"><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="M12 12v9"/><path d="m16 16-4-4-4 4"/></svg>',
-        "pdf": f'<svg xmlns="http://www.w3.org/2000/svg" width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" stroke="{color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 6px;"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><path d="M10 12a1 1 0 0 0-1 1v4a1 1 0 0 0 1 1"/><path d="M10 12h2a1 1 0 0 1 1 1v1a1 1 0 0 1-1 1h-2"/><path d="M16 12h-2v6"/></svg>',
-        "gear": f'<svg xmlns="http://www.w3.org/2000/svg" width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" stroke="{color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 6px;"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>'
-    }
-    return icons.get(name, "")
-
-# ----------------------------------------------------------------- Custom CSS
-render_html("""
-    <style>
-    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
-
-    html, body, [class*="css"] {
-        font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
-    }
-
-    .stApp {
-        background-color: #f8fafc;
-        color: #0f172a;
-    }
-
-    /* Minimalist White Label Header */
-    .header-container {
-        display: flex;
-        align-items: center;
-        gap: 16px;
-        background: #ffffff;
-        padding: 18px 24px;
-        border-radius: 12px;
-        border: 1px solid #e2e8f0;
-        margin-bottom: 20px;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
-    }
-
-    .header-logo-preview img {
-        max-height: 46px;
-        width: auto;
-        border-radius: 6px;
-    }
-
-    .header-title-text {
-        font-size: 22px;
-        font-weight: 800;
-        color: #0f172a;
-        margin: 0;
-        letter-spacing: -0.3px;
-        display: flex;
-        align-items: center;
-    }
-
-    .header-subtitle {
-        font-size: 13px;
-        color: #64748b;
-        margin-top: 2px;
-    }
-
-    /* Custom Streamlit Tabs */
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 8px;
-        background-color: #ffffff;
-        padding: 6px 10px;
-        border-radius: 10px;
-        border: 1px solid #e2e8f0;
-    }
-
-    .stTabs [data-baseweb="tab"] {
-        height: 40px;
-        border-radius: 8px;
-        font-weight: 600;
-        font-size: 13px;
-        color: #64748b;
-        padding: 0 18px;
-        border: none;
-    }
-
-    .stTabs [aria-selected="true"] {
-        background-color: #0d9488 !important;
-        color: #ffffff !important;
-    }
-
-    /* Modern Card Containers */
-    .custom-card {
-        background: #ffffff;
-        border-radius: 12px;
-        padding: 20px 24px;
-        border: 1px solid #e2e8f0;
-        margin-bottom: 18px;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
-    }
-
-    .card-title-html {
-        font-size: 16px;
-        font-weight: 700;
-        color: #0f172a;
-        margin-bottom: 16px;
-        display: flex;
-        align-items: center;
-    }
-
-    /* KPI Summary Cards */
-    .kpi-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-        gap: 14px;
-        margin-bottom: 18px;
-    }
-
-    .kpi-card {
-        background: #ffffff;
-        border: 1px solid #e2e8f0;
-        border-radius: 10px;
-        padding: 14px 18px;
-        box-shadow: 0 1px 2px rgba(0,0,0,0.02);
-    }
-
-    .kpi-card-teal { border-left: 4px solid #0d9488; }
-    .kpi-card-emerald { border-left: 4px solid #10b981; }
-    .kpi-card-amber { border-left: 4px solid #f59e0b; }
-
-    .kpi-label {
-        font-size: 11px;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-        color: #64748b;
-    }
-
-    .kpi-value {
-        font-size: 22px;
-        font-weight: 800;
-        color: #0f172a;
-        margin-top: 2px;
-    }
-
-    /* Outline Badges */
-    .badge {
-        display: inline-flex;
-        align-items: center;
-        padding: 3px 10px;
-        border-radius: 9999px;
-        font-size: 12px;
-        font-weight: 600;
-    }
-
-    .badge-success {
-        background-color: #f0fdf4;
-        color: #15803d;
-        border: 1px solid #bbf7d0;
-    }
-
-    .badge-danger {
-        background-color: #fef2f2;
-        color: #b91c1c;
-        border: 1px solid #fecaca;
-    }
-
-    /* Primary Buttons */
-    .stButton>button[kind="primary"] {
-        background: #0d9488;
-        border: none;
-        font-weight: 700;
-        box-shadow: 0 2px 8px rgba(13, 148, 136, 0.2);
-        border-radius: 8px;
-    }
-    
-    .stButton>button[kind="primary"]:hover {
-        background: #0f766e;
-    }
-    </style>
-""")
-
 # ----------------------------------------------------------------- Saved State & Settings Persistence
 if "saved_logo_path" not in st.session_state:
     if os.path.exists(LOGO_SAVED_PATH):
@@ -286,27 +124,18 @@ if "default_company" not in st.session_state:
         "email": "",
     }
 
-# Render Header with Custom Saved Logo if available
-logo_header_html = ""
-if st.session_state.get("saved_logo_path") and os.path.exists(st.session_state.saved_logo_path):
-    try:
-        with open(st.session_state.saved_logo_path, "rb") as img_file:
-            enc = base64.b64encode(img_file.read()).decode()
-        logo_header_html = f'<div class="header-logo-preview"><img src="data:image/png;base64,{enc}" alt="Company Logo" /></div>'
-    except Exception:
-        pass
+# ----------------------------------------------------------------- Native Streamlit Top Header
+with st.container():
+    c_logo, c_title = st.columns([1, 8])
+    with c_logo:
+        if st.session_state.get("saved_logo_path") and os.path.exists(st.session_state.saved_logo_path):
+            st.image(st.session_state.saved_logo_path, width=70)
+    with c_title:
+        display_title = st.session_state.default_company.get("nome") or "Orça Rápido Monolítico"
+        st.title(f"📐 {display_title}")
+        st.caption("Medição Vetorial de Paredes em Painéis EPS & Orçamentos Automatizados")
 
-company_display_title = st.session_state.default_company.get("nome") or "Orça Rápido Monolítico"
-
-render_html(f"""
-    <div class="header-container">
-        {logo_header_html}
-        <div>
-            <div class="header-title-text">{icon('ruler', 22, '#0d9488')} {company_display_title}</div>
-            <div class="header-subtitle">Medição Vetorial de Paredes em Painéis EPS & Orçamentos Automatizados</div>
-        </div>
-    </div>
-""")
+st.divider()
 
 # Initialize Session State
 if "doc" not in st.session_state:
@@ -359,20 +188,20 @@ if HAS_OPTION_MENU:
     tab4_active = (selected_tab == "Configurações")
 else:
     tab1, tab2, tab3, tab4 = st.tabs([
-        "Planta & Medição",
-        "Empresa & Cliente",
-        "Condições & Gerar PDF",
-        "Configurações"
+        "📁 Planta & Medição",
+        "🏢 Empresa & Cliente",
+        "💼 Condições & Gerar PDF",
+        "⚙️ Configurações"
     ])
     tab1_active, tab2_active, tab3_active, tab4_active = True, True, True, True
 
 # ----------------------------------------------------------------- Tab 1: Planta & Medição
 def render_tab1():
-    render_html(f'<div class="card-title-html">{icon("upload", 18, "#0d9488")} Upload da Planta Baixa</div>')
+    st.subheader("📁 Upload da Planta Baixa (DWG / DXF)")
     uploaded = st.file_uploader(
         "Selecione o arquivo da planta (.dwg ou .dxf)",
         type=["dwg", "dxf"],
-        help="Arquivos DWG são convertidos automaticamente para DXF.",
+        help="Arquivos DWG são convertidos automaticamente para DXF via LibreDWG.",
     )
 
     if uploaded is not None:
@@ -411,7 +240,7 @@ def render_tab1():
 
     if st.session_state.summary:
         st.divider()
-        render_html(f'<div class="card-title-html">{icon("ruler", 18, "#0d9488")} Resumo da Medição Automatizada</div>')
+        st.subheader("📊 Resumo da Medição Automatizada")
 
         total_confirmed = 0.0
         total_high_conf = 0.0
@@ -427,35 +256,19 @@ def render_tab1():
                 total_review += r["unpaired_length_m"]
                 total_confirmed += st.session_state.confirmed.get(layer_name, r["paired_length_m"])
 
-        # KPI Summary Grid
-        render_html(f"""
-            <div class="kpi-grid">
-                <div class="kpi-card kpi-card-teal">
-                    <div class="kpi-label">Metragem Total Confirmada</div>
-                    <div class="kpi-value">{total_confirmed:.2f} m</div>
-                </div>
-                <div class="kpi-card kpi-card-emerald">
-                    <div class="kpi-label">Alta Confiança (Duplas)</div>
-                    <div class="kpi-value">{total_high_conf:.2f} m</div>
-                </div>
-                <div class="kpi-card kpi-card-amber">
-                    <div class="kpi-label">Linhas a Revisar</div>
-                    <div class="kpi-value">{total_review:.2f} m</div>
-                </div>
-            </div>
-        """)
+        # KPI Summary Native Columns
+        k1, k2, k3 = st.columns(3)
+        k1.metric("Metragem Total Confirmada", f"{total_confirmed:.2f} m")
+        k2.metric("Alta Confiança (Duplas)", f"{total_high_conf:.2f} m")
+        k3.metric("Linhas a Revisar", f"{total_review:.2f} m")
 
-        render_html(f'<div class="card-title-html">{icon("file-cad", 18, "#0d9488")} Camadas de Parede Identificadas</div>')
+        st.divider()
+        st.subheader("🧱 Camadas de Parede Identificadas")
         for layer_name, r in st.session_state.summary.items():
             is_rev = "REV" in layer_name.upper()
-            badge_html = (
-                f'<span class="badge badge-danger">{icon("warning", 13, "#b91c1c")} Revestimento</span>'
-                if is_rev
-                else f'<span class="badge badge-success">{icon("check", 13, "#15803d")} Parede Estrutural</span>'
-            )
+            badge_label = "⚠️ Revestimento" if is_rev else "✓ Parede Estrutural"
 
-            with st.expander(f"Layer: {layer_name}", expanded=True):
-                render_html(f"Tipo: {badge_html}")
+            with st.expander(f"Layer: {layer_name} ({badge_label})", expanded=True):
                 included = st.checkbox(
                     "Incluir no cálculo da proposta",
                     value=st.session_state.included.get(layer_name, True),
@@ -469,7 +282,7 @@ def render_tab1():
                     col_m1.metric("Alta confiança", f"{r['paired_length_m']} m")
                     col_m2.metric("A revisar", f"{r['unpaired_length_m']} m")
 
-                    if st.button("Gerar overlay de conferência", key=f"overlay_{layer_name}"):
+                    if st.button("🔍 Gerar overlay de conferência", key=f"overlay_{layer_name}"):
                         png_path = os.path.join(tempfile.gettempdir(), f"overlay_{abs(hash(layer_name))}.png")
                         render_overlay_png(st.session_state.doc, layer_name, png_path)
                         st.session_state[f"png_{layer_name}"] = png_path
@@ -497,10 +310,7 @@ def render_tab2():
     col_a, col_b = st.columns(2)
 
     with col_a:
-        render_html(f"""
-            <div class="custom-card">
-                <div class="card-title-html">{icon("building", 18, "#0d9488")} Empresa Contratada (Remetente)</div>
-        """)
+        st.subheader("🏢 Empresa Contratada (Remetente)")
         
         comp_cnpj_in = st.text_input("CNPJ da Empresa", value=st.session_state.get("comp_cnpj", ""), placeholder="00.000.000/0001-00", key="input_comp_cnpj")
         
@@ -527,13 +337,9 @@ def render_tab2():
         company_tel = st.text_input("Telefone", value=st.session_state.get("comp_tel", ""), placeholder="(11) 0000-0000", key="comp_tel")
         company_whatsapp = st.text_input("WhatsApp", value=st.session_state.get("comp_wsp", ""), placeholder="(11) 90000-0000", key="comp_wsp")
         company_email = st.text_input("E-mail comercial", value=st.session_state.get("comp_email", ""), placeholder="contato@empresa.com.br", key="comp_email")
-        render_html("</div>")
 
     with col_b:
-        render_html(f"""
-            <div class="custom-card">
-                <div class="card-title-html">{icon("user", 18, "#0d9488")} Cliente Contratante</div>
-        """)
+        st.subheader("👤 Cliente Contratante")
         
         cli_doc_in = st.text_input("CPF / CNPJ do Cliente", value=st.session_state.get("cli_doc", ""), placeholder="00.000.000/0001-00", key="input_cli_doc")
         
@@ -557,14 +363,10 @@ def render_tab2():
         client_endereco = st.text_input("Endereço da obra", value=st.session_state.get("cli_end", ""), placeholder="Rua da Obra, 100 - São Paulo/SP", key="cli_end")
         client_tel = st.text_input("Telefone", value=st.session_state.get("cli_tel", ""), placeholder="(11) 99999-9999", key="cli_tel")
         client_email = st.text_input("E-mail", value=st.session_state.get("cli_email", ""), placeholder="cliente@email.com", key="cli_email")
-        render_html("</div>")
 
 # ----------------------------------------------------------------- Tab 3: Condições & Gerar PDF
 def render_tab3():
-    render_html(f"""
-        <div class="custom-card">
-            <div class="card-title-html">{icon("terms", 18, "#0d9488")} Condições Comerciais</div>
-    """)
+    st.subheader("💼 Condições Comerciais")
 
     col_c, col_d, col_e = st.columns(3)
     with col_c:
@@ -601,11 +403,11 @@ def render_tab3():
         placeholder="Ex: Instalação de painéis monolíticos EPS conforme especificações técnicas do fabricante.",
         key="comm_obs",
     )
-    render_html("</div>")
 
-    render_html(f'<div class="card-title-html">{icon("pdf", 18, "#0d9488")} Emissão da Proposta em PDF</div>')
+    st.divider()
+    st.subheader("📄 Emissão da Proposta em PDF")
 
-    if st.button("Gerar Proposta Comercial em PDF", type="primary", use_container_width=True):
+    if st.button("📄 Gerar Proposta Comercial em PDF", type="primary", use_container_width=True):
         if not st.session_state.summary:
             st.error("Faça o upload de uma planta baixa na Aba 1 antes de gerar a proposta.")
             st.stop()
@@ -671,13 +473,13 @@ def render_tab3():
             pdf_bytes = f.read()
 
         st.success(
-            f"Proposta gerada com sucesso! Metragem: **{budget.total_length_m:.2f} m** | "
+            f"🎉 Proposta gerada com sucesso! Metragem: **{budget.total_length_m:.2f} m** | "
             f"Valor Total: **{format_brl(budget.total_value)}**"
         )
 
         cli_filename = (st.session_state.get('cli_nome') or 'Cliente').replace(' ', '_')
         st.download_button(
-            "Baixar Proposta Comercial em PDF",
+            "⬇️ Baixar Proposta Comercial em PDF",
             data=pdf_bytes,
             file_name=f"Proposta_Monolitico_{cli_filename}.pdf",
             mime="application/pdf",
@@ -686,18 +488,12 @@ def render_tab3():
 
 # ----------------------------------------------------------------- Tab 4: Configurações (Logo & Dados Padrão)
 def render_tab4():
-    render_html(f"""
-        <div class="custom-card">
-            <div class="card-title-html">{icon("gear", 18, "#0d9488")} Configurações da Empresa & Logotipo Padrão</div>
-            <p style="font-size: 13px; color: #64748b;">
-                Cadastre o logotipo e os dados padrão da sua empresa. As informações salvas aqui serão pré-carregadas automaticamente em todas as novas propostas e impressas no PDF.
-            </p>
-        </div>
-    """)
+    st.subheader("⚙️ Configurações da Empresa & Logotipo Padrão")
+    st.caption("Cadastre o logotipo e os dados padrão da sua empresa. As informações salvas serão pré-carregadas em todas as propostas.")
 
     col_logo1, col_logo2 = st.columns([1, 2])
     with col_logo1:
-        st.markdown("**Logotipo Atual:**")
+        st.write("**Logotipo Atual:**")
         if st.session_state.get("saved_logo_path") and os.path.exists(st.session_state.saved_logo_path):
             st.image(st.session_state.saved_logo_path, width=160, caption="Logotipo Ativo para PDF")
             if st.button("❌ Remover Logotipo", key="btn_remove_logo"):
@@ -726,7 +522,7 @@ def render_tab4():
                 st.error(f"Erro ao salvar a imagem do logotipo: {e}")
 
     st.divider()
-    render_html('<div class="card-title-html">Dados Padrão da Empresa (Remetente)</div>')
+    st.subheader("🏢 Dados Padrão da Empresa (Remetente)")
 
     cnpj_def_in = st.text_input(
         "CNPJ da Empresa",
