@@ -1,7 +1,4 @@
-"""
-Orça Rápido Monolítico — Calculadora de Instalação por Metragem de Parede em Painéis EPS
-======================================================================================
-"""
+# Orça Rápido Monolítico — Calculadora de Instalação por Metragem de Parede em Painéis EPS
 import os
 import tempfile
 import urllib.request
@@ -125,11 +122,26 @@ if "default_company" not in st.session_state:
     }
 
 # ----------------------------------------------------------------- Native Streamlit Top Header
+def _is_valid_image(path: str) -> bool:
+    """Return True only if the image file exists and can be fully opened by PIL."""
+    try:
+        from PIL import Image as _Image
+        img = _Image.open(path)
+        img.verify()  # Raises if file is truncated or corrupt
+        return True
+    except Exception:
+        return False
+
 with st.container():
     c_logo, c_title = st.columns([1, 8])
     with c_logo:
-        if st.session_state.get("saved_logo_path") and os.path.exists(st.session_state.saved_logo_path):
-            st.image(st.session_state.saved_logo_path, width=70)
+        logo_path = st.session_state.get("saved_logo_path")
+        if logo_path and os.path.exists(logo_path):
+            if _is_valid_image(logo_path):
+                st.image(logo_path, width=70)
+            else:
+                # File is truncated / corrupt — clear it so it doesn't keep crashing
+                st.session_state.saved_logo_path = None
     with c_title:
         display_title = st.session_state.default_company.get("nome") or "Orça Rápido Monolítico"
         st.title(f"📐 {display_title}")
