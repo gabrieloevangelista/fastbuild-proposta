@@ -1,4 +1,4 @@
-# Orça Rápido Monolítico — Calculadora de Instalação por Metragem de Parede em Painéis EPS
+# Orça Rápido Monolítico — Calculadora de Instalação por Metragem de Parede & Área Total em Painéis EPS
 import os
 import tempfile
 import urllib.request
@@ -21,40 +21,82 @@ except ImportError:
     HAS_OPTION_MENU = False
 
 st.set_page_config(
-    page_title="Orça Rápido Monolítico — Medição de Paredes EPS",
+    page_title="Orça Rápido Monolítico — Medição de Área & Paredes EPS",
     layout="wide",
     initial_sidebar_state="collapsed",
 )
 
 LOGO_SAVED_PATH = os.path.join(tempfile.gettempdir(), "custom_company_logo.png")
 
-# ----------------------------------------------------------------- Clean Custom CSS
+# ----------------------------------------------------------------- Saved State & Settings Persistence
+if "theme_color" not in st.session_state:
+    st.session_state.theme_color = "#0d9488"
+
+if "saved_logo_path" not in st.session_state:
+    if os.path.exists(LOGO_SAVED_PATH):
+        st.session_state.saved_logo_path = LOGO_SAVED_PATH
+    else:
+        st.session_state.saved_logo_path = None
+
+if "default_company" not in st.session_state:
+    st.session_state.default_company = {
+        "nome": "",
+        "razao": "",
+        "cnpj": "",
+        "end": "",
+        "tel": "",
+        "wsp": "",
+        "email": "",
+    }
+
+theme_color = st.session_state.theme_color
+
+# ----------------------------------------------------------------- Dynamic CSS with Bootstrap Icons
 st.markdown(
-    """
+    f"""
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 
-    html, body, [class*="css"] {
+    html, body, [class*="css"] {{
         font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
-    }
+    }}
 
-    .stApp {
+    .stApp {{
         background-color: #f8fafc;
         color: #0f172a;
-    }
+    }}
 
-    /* Primary Button Customization */
-    .stButton>button[kind="primary"] {
-        background: #0d9488;
-        border: none;
-        font-weight: 700;
-        box-shadow: 0 2px 8px rgba(13, 148, 136, 0.2);
-        border-radius: 8px;
-    }
+    /* Dynamic Primary Theme Color for Buttons */
+    .stButton>button[kind="primary"] {{
+        background-color: {theme_color} !important;
+        border: none !important;
+        color: #ffffff !important;
+        font-weight: 700 !important;
+        box-shadow: 0 4px 12px {theme_color}33 !important;
+        border-radius: 8px !important;
+        transition: all 0.2s ease-in-out;
+    }}
     
-    .stButton>button[kind="primary"]:hover {
-        background: #0f766e;
-    }
+    .stButton>button[kind="primary"]:hover {{
+        filter: brightness(0.9) !important;
+        transform: translateY(-1px) !important;
+    }}
+
+    .stMetric label {{
+        color: #64748b !important;
+        font-weight: 600 !important;
+    }}
+    
+    .stMetric .stMetricValue {{
+        color: {theme_color} !important;
+        font-weight: 800 !important;
+    }}
+
+    .section-icon {{
+        color: {theme_color};
+        margin-right: 8px;
+    }}
     </style>
     """,
     unsafe_allow_html=True,
@@ -103,35 +145,17 @@ def fetch_cnpj_data(cnpj: str) -> dict:
         pass
     return {}
 
-# ----------------------------------------------------------------- Saved State & Settings Persistence
-if "saved_logo_path" not in st.session_state:
-    if os.path.exists(LOGO_SAVED_PATH):
-        st.session_state.saved_logo_path = LOGO_SAVED_PATH
-    else:
-        st.session_state.saved_logo_path = None
-
-if "default_company" not in st.session_state:
-    st.session_state.default_company = {
-        "nome": "",
-        "razao": "",
-        "cnpj": "",
-        "end": "",
-        "tel": "",
-        "wsp": "",
-        "email": "",
-    }
-
-# ----------------------------------------------------------------- Native Streamlit Top Header
 def _is_valid_image(path: str) -> bool:
     """Return True only if the image file exists and can be fully opened by PIL."""
     try:
         from PIL import Image as _Image
         img = _Image.open(path)
-        img.verify()  # Raises if file is truncated or corrupt
+        img.verify()
         return True
     except Exception:
         return False
 
+# Header Render
 with st.container():
     c_logo, c_title = st.columns([1, 8])
     with c_logo:
@@ -140,11 +164,13 @@ with st.container():
             if _is_valid_image(logo_path):
                 st.image(logo_path, width=70)
             else:
-                # File is truncated / corrupt — clear it so it doesn't keep crashing
                 st.session_state.saved_logo_path = None
     with c_title:
         display_title = st.session_state.default_company.get("nome") or "Orça Rápido Monolítico"
-        st.title(f"📐 {display_title}")
+        st.markdown(
+            f"<h2><i class='bi bi-bounding-box-circles section-icon'></i>{display_title}</h2>",
+            unsafe_allow_html=True,
+        )
         st.caption("Medição Vetorial de Área Total (m²) & Paredes em Painéis EPS — Orçamentos Automatizados")
 
 st.divider()
@@ -185,33 +211,33 @@ for cli_field in ["cli_nome", "cli_doc", "cli_end", "cli_tel", "cli_email"]:
 if HAS_OPTION_MENU:
     selected_tab = option_menu(
         menu_title=None,
-        options=["Planta & Medição", "Empresa & Cliente", "Condições & Gerar PDF", "Configurações"],
-        icons=["file-earmark-code", "building-gear", "file-earmark-pdf", "gear"],
+        options=["Planta & Medição", "Empresa & Cliente", "Condições & Gerar PDF", "Configurações & Tema"],
+        icons=["layers-half", "building-gear", "file-earmark-pdf", "sliders"],
         default_index=0,
         orientation="horizontal",
         styles={
             "container": {"padding": "4px", "background-color": "#ffffff", "border-radius": "10px", "border": "1px solid #e2e8f0", "margin-bottom": "20px"},
-            "icon": {"color": "#0d9488", "font-size": "15px"},
+            "icon": {"color": theme_color, "font-size": "15px"},
             "nav-link": {"font-size": "13px", "text-align": "center", "margin": "0px 4px", "font-weight": "600", "color": "#64748b", "border-radius": "6px"},
-            "nav-link-selected": {"background-color": "#0d9488", "color": "#ffffff"},
+            "nav-link-selected": {"background-color": theme_color, "color": "#ffffff"},
         }
     )
     tab1_active = (selected_tab == "Planta & Medição")
     tab2_active = (selected_tab == "Empresa & Cliente")
     tab3_active = (selected_tab == "Condições & Gerar PDF")
-    tab4_active = (selected_tab == "Configurações")
+    tab4_active = (selected_tab == "Configurações & Tema")
 else:
     tab1, tab2, tab3, tab4 = st.tabs([
-        "📁 Planta & Medição",
-        "🏢 Empresa & Cliente",
-        "💼 Condições & Gerar PDF",
-        "⚙️ Configurações"
+        "Planta & Medição",
+        "Empresa & Cliente",
+        "Condições & Gerar PDF",
+        "Configurações & Tema"
     ])
     tab1_active, tab2_active, tab3_active, tab4_active = True, True, True, True
 
 # ----------------------------------------------------------------- Tab 1: Planta & Medição
 def render_tab1():
-    st.subheader("📁 Upload da Planta Baixa (DWG / DXF)")
+    st.markdown(f"### <i class='bi bi-folder-symlink section-icon'></i>Upload da Planta Baixa (DWG / DXF)", unsafe_allow_html=True)
     uploaded = st.file_uploader(
         "Selecione o arquivo da planta (.dwg ou .dxf)",
         type=["dwg", "dxf"],
@@ -251,11 +277,11 @@ def render_tab1():
             st.session_state.included = {}
 
         if not st.session_state.summary:
-            st.warning("Nenhuma camada contendo geometria foi encontrada no arquivo CAD.")
+            st.warning("Nenhuma camada com geometria foi encontrada no arquivo CAD.")
 
     if st.session_state.summary:
         st.divider()
-        st.subheader("📊 Resumo da Medição Automatizada (Área & Paredes)")
+        st.markdown(f"### <i class='bi bi-bar-chart-line section-icon'></i>Resumo da Medição Automatizada (Área & Paredes)", unsafe_allow_html=True)
 
         total_confirmed_area = 0.0
         total_auto_area = 0.0
@@ -282,10 +308,10 @@ def render_tab1():
         k4.metric("Linhas a Revisar", f"{total_review:.2f} m")
 
         st.divider()
-        st.subheader("🧱 Camadas Identificadas")
+        st.markdown(f"### <i class='bi bi-bricks section-icon'></i>Camadas Identificadas", unsafe_allow_html=True)
         for layer_name, r in st.session_state.summary.items():
             is_rev = "REV" in layer_name.upper()
-            badge_label = "⚠️ Revestimento" if is_rev else "✓ Geometria / Parede"
+            badge_label = "Revestimento (Revisar)" if is_rev else "Geometria Estrutural"
 
             with st.expander(f"Layer: {layer_name} ({badge_label})", expanded=True):
                 included = st.checkbox(
@@ -302,7 +328,7 @@ def render_tab1():
                     col_m2.metric("Paredes (Pares)", f"{r['paired_length_m']} m")
                     col_m3.metric("Paredes (Revisar)", f"{r['unpaired_length_m']} m")
 
-                    if st.button("🔍 Gerar overlay de conferência", key=f"overlay_{layer_name}"):
+                    if st.button("Gerar overlay de conferência", key=f"overlay_{layer_name}"):
                         png_path = os.path.join(tempfile.gettempdir(), f"overlay_{abs(hash(layer_name))}.png")
                         render_overlay_png(st.session_state.doc, layer_name, png_path)
                         st.session_state[f"png_{layer_name}"] = png_path
@@ -335,17 +361,16 @@ def render_tab1():
                     )
                     st.session_state.confirmed[layer_name] = confirmed_len
 
-
 # ----------------------------------------------------------------- Tab 2: Empresa & Cliente
 def render_tab2():
     col_a, col_b = st.columns(2)
 
     with col_a:
-        st.subheader("🏢 Empresa Contratada (Remetente)")
+        st.markdown(f"### <i class='bi bi-building section-icon'></i>Empresa Contratada (Remetente)", unsafe_allow_html=True)
         
         comp_cnpj_in = st.text_input("CNPJ da Empresa", value=st.session_state.get("comp_cnpj", ""), placeholder="00.000.000/0001-00", key="input_comp_cnpj")
         
-        if st.button("🔍 Autopreencher por CNPJ (Empresa)", key="btn_cnpj_comp"):
+        if st.button("Autopreencher por CNPJ (Empresa)", key="btn_cnpj_comp"):
             if comp_cnpj_in:
                 with st.spinner("Consultando dados da empresa via Receita..."):
                     fetched = fetch_cnpj_data(comp_cnpj_in)
@@ -370,11 +395,11 @@ def render_tab2():
         company_email = st.text_input("E-mail comercial", value=st.session_state.get("comp_email", ""), placeholder="contato@empresa.com.br", key="comp_email")
 
     with col_b:
-        st.subheader("👤 Cliente Contratante")
+        st.markdown(f"### <i class='bi bi-person-badge section-icon'></i>Cliente Contratante", unsafe_allow_html=True)
         
         cli_doc_in = st.text_input("CPF / CNPJ do Cliente", value=st.session_state.get("cli_doc", ""), placeholder="00.000.000/0001-00", key="input_cli_doc")
         
-        if st.button("🔍 Autopreencher por CNPJ (Cliente)", key="btn_cnpj_cli"):
+        if st.button("Autopreencher por CNPJ (Cliente)", key="btn_cnpj_cli"):
             if cli_doc_in:
                 with st.spinner("Consultando dados do cliente..."):
                     fetched = fetch_cnpj_data(cli_doc_in)
@@ -397,7 +422,7 @@ def render_tab2():
 
 # ----------------------------------------------------------------- Tab 3: Condições & Gerar PDF
 def render_tab3():
-    st.subheader("💼 Condições Comerciais")
+    st.markdown(f"### <i class='bi bi-briefcase section-icon'></i>Condições Comerciais", unsafe_allow_html=True)
 
     col_c, col_d, col_e = st.columns(3)
     with col_c:
@@ -436,9 +461,9 @@ def render_tab3():
     )
 
     st.divider()
-    st.subheader("📄 Emissão da Proposta em PDF")
+    st.markdown(f"### <i class='bi bi-file-earmark-pdf section-icon'></i>Emissão da Proposta em PDF", unsafe_allow_html=True)
 
-    if st.button("📄 Gerar Proposta Comercial em PDF", type="primary", use_container_width=True):
+    if st.button("Gerar Proposta Comercial em PDF", type="primary", use_container_width=True):
         if not st.session_state.summary:
             st.error("Faça o upload de uma planta baixa na Aba 1 antes de gerar a proposta.")
             st.stop()
@@ -506,23 +531,49 @@ def render_tab3():
             pdf_bytes = f.read()
 
         st.success(
-            f"🎉 Proposta gerada com sucesso! Área Total: **{budget.total_area_m2:.2f} m²** | "
-            f"Valor Total: **{format_brl(budget.total_value)}**"
+            f"Proposta gerada com sucesso! Área Total: {budget.total_area_m2:.2f} m² | "
+            f"Valor Total: {format_brl(budget.total_value)}"
         )
-
 
         cli_filename = (st.session_state.get('cli_nome') or 'Cliente').replace(' ', '_')
         st.download_button(
-            "⬇️ Baixar Proposta Comercial em PDF",
+            "Baixar Proposta Comercial em PDF",
             data=pdf_bytes,
             file_name=f"Proposta_Monolitico_{cli_filename}.pdf",
             mime="application/pdf",
             use_container_width=True,
         )
 
-# ----------------------------------------------------------------- Tab 4: Configurações (Logo & Dados Padrão)
+# ----------------------------------------------------------------- Tab 4: Configurações & Personalização do Tema
 def render_tab4():
-    st.subheader("⚙️ Configurações da Empresa & Logotipo Padrão")
+    st.markdown(f"### <i class='bi bi-palette section-icon'></i>Personalização do Tema & Cores da Aplicação", unsafe_allow_html=True)
+    st.caption("Altere a cor principal da marca do aplicativo. A cor selecionada será aplicada aos botões, métricas e elementos de destaque.")
+
+    col_thm1, col_thm2 = st.columns([1, 2])
+    with col_thm1:
+        current_color = st.session_state.get("theme_color", "#0d9488")
+        chosen_color = st.color_picker("Cor Primária do Tema", value=current_color, key="color_picker_input")
+    
+    with col_thm2:
+        preset_option = st.selectbox(
+            "Ou selecione um tema predefinido",
+            [
+                "Personalizado (Usar Seletor)",
+                "Verde Esmeralda (#0d9488)",
+                "Verde FastBuild (#2FAE74)",
+                "Azul Oceano (#0284c7)",
+                "Roxo Moderno (#7c3aed)",
+                "Grafite Elegante (#334155)",
+                "Vermelho Carmim (#dc2626)",
+            ],
+            key="preset_theme_select",
+        )
+        if preset_option != "Personalizado (Usar Seletor)":
+            hex_code = preset_option.split("(")[-1].replace(")", "").strip()
+            chosen_color = hex_code
+
+    st.divider()
+    st.markdown(f"### <i class='bi bi-image section-icon'></i>Logotipo Padrão da Empresa", unsafe_allow_html=True)
     st.caption("Cadastre o logotipo e os dados padrão da sua empresa. As informações salvas serão pré-carregadas em todas as propostas.")
 
     col_logo1, col_logo2 = st.columns([1, 2])
@@ -530,7 +581,7 @@ def render_tab4():
         st.write("**Logotipo Atual:**")
         if st.session_state.get("saved_logo_path") and os.path.exists(st.session_state.saved_logo_path):
             st.image(st.session_state.saved_logo_path, width=160, caption="Logotipo Ativo para PDF")
-            if st.button("❌ Remover Logotipo", key="btn_remove_logo"):
+            if st.button("Remover Logotipo", key="btn_remove_logo"):
                 if os.path.exists(st.session_state.saved_logo_path):
                     os.remove(st.session_state.saved_logo_path)
                 st.session_state.saved_logo_path = None
@@ -556,7 +607,7 @@ def render_tab4():
                 st.error(f"Erro ao salvar a imagem do logotipo: {e}")
 
     st.divider()
-    st.subheader("🏢 Dados Padrão da Empresa (Remetente)")
+    st.markdown(f"### <i class='bi bi-building-gear section-icon'></i>Dados Padrão da Empresa (Remetente)", unsafe_allow_html=True)
 
     cnpj_def_in = st.text_input(
         "CNPJ da Empresa",
@@ -565,7 +616,7 @@ def render_tab4():
         key="set_cnpj_in",
     )
 
-    if st.button("🔍 Autopreencher Dados Padrão por CNPJ", key="btn_set_cnpj"):
+    if st.button("Autopreencher Dados Padrão por CNPJ", key="btn_set_cnpj"):
         if cnpj_def_in:
             with st.spinner("Consultando dados da empresa via Receita..."):
                 fetched = fetch_cnpj_data(cnpj_def_in)
@@ -597,7 +648,8 @@ def render_tab4():
         def_wsp = st.text_input("WhatsApp", value=st.session_state.default_company.get("wsp", ""), key="set_wsp")
         def_email = st.text_input("E-mail Comercial", value=st.session_state.default_company.get("email", ""), key="set_email")
 
-    if st.button("💾 Salvar Configurações Padrão da Empresa", type="primary", use_container_width=True):
+    if st.button("Salvar Configurações & Tema", type="primary", use_container_width=True):
+        st.session_state.theme_color = chosen_color
         st.session_state.default_company = {
             "nome": def_nome,
             "razao": def_razao,
@@ -616,7 +668,8 @@ def render_tab4():
         st.session_state["comp_wsp"] = def_wsp
         st.session_state["comp_email"] = def_email
 
-        st.success("🎉 Configurações salvas com sucesso! Os dados padrão serão carregados em todas as propostas.")
+        st.success("Configurações e cor do tema salvas com sucesso!")
+        st.rerun()
 
 # Render View Based on Active Tab
 if HAS_OPTION_MENU:
