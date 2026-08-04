@@ -14,16 +14,39 @@ from dwg_convert import convert_dwg_to_dxf, dwg2dxf_available, DwgConversionErro
 from calc_engine import FloorMeasurement, calculate_budget, format_brl, DEFAULT_RATE_PER_METER
 from pdf_generator import generate_proposal_pdf, Company, Client, Project, Terms
 
+# Try importing streamlit-option-menu for modern navigation
+try:
+    from streamlit_option_menu import option_menu
+    HAS_OPTION_MENU = True
+except ImportError:
+    HAS_OPTION_MENU = False
+
 st.set_page_config(
     page_title="FastBuild — Proposta por Metragem de Parede",
-    page_icon="📐",
     layout="wide",
     initial_sidebar_state="collapsed",
 )
 
 LOGO_PATH = os.path.join(os.path.dirname(__file__), "assets", "fastbuild_logo.png")
 
-# ----------------------------------------------------------------- Custom Light Clean CSS
+# ----------------------------------------------------------------- SVG Outline Icons Helper
+def icon(name: str, size: int = 18, color: str = "currentColor") -> str:
+    icons = {
+        "file-cad": f'<svg xmlns="http://www.w3.org/2000/svg" width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" stroke="{color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 6px;"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><path d="M8 13h8"/><path d="M8 17h8"/><path d="M10 9h2"/></svg>',
+        "ruler": f'<svg xmlns="http://www.w3.org/2000/svg" width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" stroke="{color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 6px;"><path d="M21.3 15.3a2.4 2.4 0 0 1 0 3.4l-2.6 2.6a2.4 2.4 0 0 1-3.4 0L2.7 8.7a2.4 2.4 0 0 1 0-3.4l2.6-2.6a2.4 2.4 0 0 1 3.4 0l12.6 12.6z"/><path d="m14.5 12.5 2-2"/><path d="m11.5 9.5 2-2"/><path d="m8.5 6.5 2-2"/><path d="m17.5 15.5 2-2"/></svg>',
+        "building": f'<svg xmlns="http://www.w3.org/2000/svg" width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" stroke="{color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 6px;"><rect x="4" y="2" width="16" height="20" rx="2" ry="2"/><path d="M9 22v-4h6v4"/><path d="M8 6h.01"/><path d="M16 6h.01"/><path d="M12 6h.01"/><path d="M12 10h.01"/><path d="M12 14h.01"/><path d="M16 10h.01"/><path d="M16 14h.01"/><path d="M8 10h.01"/><path d="M8 14h.01"/></svg>',
+        "user": f'<svg xmlns="http://www.w3.org/2000/svg" width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" stroke="{color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 6px;"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>',
+        "terms": f'<svg xmlns="http://www.w3.org/2000/svg" width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" stroke="{color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 6px;"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 6v12"/></svg>',
+        "download": f'<svg xmlns="http://www.w3.org/2000/svg" width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" stroke="{color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 6px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>',
+        "check": f'<svg xmlns="http://www.w3.org/2000/svg" width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" stroke="{color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 4px;"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>',
+        "warning": f'<svg xmlns="http://www.w3.org/2000/svg" width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" stroke="{color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 4px;"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
+        "search": f'<svg xmlns="http://www.w3.org/2000/svg" width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" stroke="{color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 6px;"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>',
+        "upload": f'<svg xmlns="http://www.w3.org/2000/svg" width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" stroke="{color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 6px;"><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="M12 12v9"/><path d="m16 16-4-4-4 4"/></svg>',
+        "pdf": f'<svg xmlns="http://www.w3.org/2000/svg" width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" stroke="{color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 6px;"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><path d="M10 12a1 1 0 0 0-1 1v4a1 1 0 0 0 1 1"/><path d="M10 12h2a1 1 0 0 1 1 1v1a1 1 0 0 1-1 1h-2"/><path d="M16 12h-2v6"/></svg>'
+    }
+    return icons.get(name, "")
+
+# ----------------------------------------------------------------- Custom Light Minimalist CSS
 st.markdown(
     """
     <style>
@@ -38,31 +61,33 @@ st.markdown(
         color: #0f172a;
     }
 
-    /* Light Clean Header Banner */
+    /* Minimalist Light Header */
     .header-container {
         display: flex;
         align-items: center;
-        gap: 20px;
+        gap: 16px;
         background: #ffffff;
-        padding: 20px 28px;
-        border-radius: 16px;
+        padding: 16px 24px;
+        border-radius: 12px;
         border: 1px solid #e2e8f0;
-        margin-bottom: 24px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+        margin-bottom: 20px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
     }
     
     .header-logo img {
-        height: 52px;
+        height: 48px;
         width: auto;
-        border-radius: 10px;
+        border-radius: 8px;
     }
 
     .header-title-text {
-        font-size: 24px;
+        font-size: 22px;
         font-weight: 800;
         color: #0f172a;
         margin: 0;
         letter-spacing: -0.3px;
+        display: flex;
+        align-items: center;
     }
 
     .header-subtitle {
@@ -71,22 +96,22 @@ st.markdown(
         margin-top: 2px;
     }
 
-    /* Custom Streamlit Tabs */
+    /* Custom Streamlit Tabs (Fallback if Option Menu not loaded) */
     .stTabs [data-baseweb="tab-list"] {
         gap: 8px;
         background-color: #ffffff;
         padding: 6px 10px;
-        border-radius: 12px;
+        border-radius: 10px;
         border: 1px solid #e2e8f0;
     }
 
     .stTabs [data-baseweb="tab"] {
-        height: 42px;
+        height: 40px;
         border-radius: 8px;
         font-weight: 600;
-        font-size: 14px;
+        font-size: 13px;
         color: #64748b;
-        padding: 0 20px;
+        padding: 0 18px;
         border: none;
     }
 
@@ -98,37 +123,36 @@ st.markdown(
     /* Modern Card Containers */
     .custom-card {
         background: #ffffff;
-        border-radius: 14px;
-        padding: 24px;
+        border-radius: 12px;
+        padding: 20px 24px;
         border: 1px solid #e2e8f0;
-        margin-bottom: 20px;
-        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.02);
+        margin-bottom: 18px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
     }
 
-    .card-title {
+    .card-title-html {
         font-size: 16px;
         font-weight: 700;
         color: #0f172a;
         margin-bottom: 16px;
         display: flex;
         align-items: center;
-        gap: 8px;
     }
 
     /* KPI Summary Cards */
     .kpi-grid {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-        gap: 16px;
-        margin-bottom: 20px;
+        gap: 14px;
+        margin-bottom: 18px;
     }
 
     .kpi-card {
         background: #ffffff;
         border: 1px solid #e2e8f0;
-        border-radius: 12px;
-        padding: 16px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+        border-radius: 10px;
+        padding: 14px 18px;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.02);
     }
 
     .kpi-card-teal { border-left: 4px solid #0d9488; }
@@ -147,27 +171,38 @@ st.markdown(
         font-size: 22px;
         font-weight: 800;
         color: #0f172a;
-        margin-top: 4px;
+        margin-top: 2px;
     }
 
-    /* Badges */
+    /* Outline Badges */
     .badge {
-        display: inline-block;
-        padding: 4px 10px;
-        border-radius: 20px;
+        display: inline-flex;
+        align-items: center;
+        padding: 3px 10px;
+        border-radius: 9999px;
         font-size: 12px;
         font-weight: 600;
     }
 
-    .badge-success { background-color: #dcfce7; color: #15803d; }
-    .badge-danger { background-color: #fee2e2; color: #b91c1c; }
+    .badge-success {
+        background-color: #f0fdf4;
+        color: #15803d;
+        border: 1px solid #bbf7d0;
+    }
 
-    /* Buttons */
+    .badge-danger {
+        background-color: #fef2f2;
+        color: #b91c1c;
+        border: 1px solid #fecaca;
+    }
+
+    /* Primary Buttons */
     .stButton>button[kind="primary"] {
         background: #0d9488;
         border: none;
         font-weight: 700;
-        box-shadow: 0 4px 12px rgba(13, 148, 136, 0.2);
+        box-shadow: 0 2px 8px rgba(13, 148, 136, 0.2);
+        border-radius: 8px;
     }
     
     .stButton>button[kind="primary"]:hover {
@@ -178,7 +213,7 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# ----------------------------------------------------------------- Header Banner (Light Background)
+# ----------------------------------------------------------------- Header Banner (Light & Clean)
 logo_html = ""
 if os.path.exists(LOGO_PATH):
     with open(LOGO_PATH, "rb") as image_file:
@@ -190,8 +225,8 @@ st.markdown(
     <div class="header-container">
         {logo_html}
         <div>
-            <div class="header-title-text">FastBuild Propostas</div>
-            <div class="header-subtitle">Medição de Paredes em Desenhos CAD (DWG/DXF) & Geração Automática de Orçamentos</div>
+            <div class="header-title-text">{icon('ruler', 22, '#0d9488')} FastBuild Propostas</div>
+            <div class="header-subtitle">Medição Vetorial de Paredes em CAD (DWG/DXF) & Orçamentos Automatizados</div>
         </div>
     </div>
     """,
@@ -210,20 +245,39 @@ if "included" not in st.session_state:
 if "processed_file_key" not in st.session_state:
     st.session_state.processed_file_key = None
 
-# Tab Navigation
-tab1, tab2, tab3 = st.tabs([
-    "📁 1. Planta & Medição",
-    "🏢 2. Empresa & Cliente",
-    "📄 3. Condições & Gerar PDF"
-])
+# Navigation Menu
+if HAS_OPTION_MENU:
+    selected_tab = option_menu(
+        menu_title=None,
+        options=["Planta & Medição", "Empresa & Cliente", "Condições & Gerar PDF"],
+        icons=["file-earmark-code", "building-gear", "file-earmark-pdf"],
+        default_index=0,
+        orientation="horizontal",
+        styles={
+            "container": {"padding": "4px", "background-color": "#ffffff", "border-radius": "10px", "border": "1px solid #e2e8f0", "margin-bottom": "20px"},
+            "icon": {"color": "#0d9488", "font-size": "15px"},
+            "nav-link": {"font-size": "13px", "text-align": "center", "margin": "0px 4px", "font-weight": "600", "color": "#64748b", "border-radius": "6px"},
+            "nav-link-selected": {"background-color": "#0d9488", "color": "#ffffff"},
+        }
+    )
+    tab1_active = (selected_tab == "Planta & Medição")
+    tab2_active = (selected_tab == "Empresa & Cliente")
+    tab3_active = (selected_tab == "Condições & Gerar PDF")
+else:
+    tab1, tab2, tab3 = st.tabs([
+        "Planta & Medição",
+        "Empresa & Cliente",
+        "Condições & Gerar PDF"
+    ])
+    tab1_active, tab2_active, tab3_active = True, True, True
 
 # ----------------------------------------------------------------- Tab 1: Planta & Medição
-with tab1:
-    st.markdown('<div class="card-title">Upload da Planta Baixa</div>', unsafe_allow_html=True)
+def render_tab1():
+    st.markdown(f'<div class="card-title-html">{icon("upload", 18, "#0d9488")} Upload da Planta Baixa</div>', unsafe_allow_html=True)
     uploaded = st.file_uploader(
         "Selecione o arquivo da planta (.dwg ou .dxf)",
         type=["dwg", "dxf"],
-        help="Arquivos DWG são automaticamente convertidos para DXF.",
+        help="Arquivos DWG são convertidos automaticamente para DXF.",
     )
 
     # Process upload ONLY ONCE per file (prevents constant reload on form edits)
@@ -259,11 +313,11 @@ with tab1:
             st.session_state.included = {}
 
         if not st.session_state.summary:
-            st.warning("Nenhuma camada com 'parede' no nome foi encontrada. Verifique o arquivo CAD.")
+            st.warning("Nenhuma camada contendo 'parede' no nome foi encontrada. Verifique as camadas do arquivo CAD.")
 
     if st.session_state.summary:
         st.divider()
-        st.markdown('<div class="card-title">Resumo da Medição Automatizada</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="card-title-html">{icon("ruler", 18, "#0d9488")} Resumo da Medição Automatizada</div>', unsafe_allow_html=True)
 
         total_confirmed = 0.0
         total_high_conf = 0.0
@@ -300,13 +354,13 @@ with tab1:
             unsafe_allow_html=True,
         )
 
-        st.markdown('<div class="card-title">Camadas de Parede Identificadas</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="card-title-html">{icon("file-cad", 18, "#0d9488")} Camadas de Parede Identificadas</div>', unsafe_allow_html=True)
         for layer_name, r in st.session_state.summary.items():
             is_rev = "REV" in layer_name.upper()
             badge_html = (
-                '<span class="badge badge-danger">⚠️ Revestimento</span>'
+                f'<span class="badge badge-danger">{icon("warning", 13, "#b91c1c")} Revestimento</span>'
                 if is_rev
-                else '<span class="badge badge-success">✓ Parede Estrutural</span>'
+                else f'<span class="badge badge-success">{icon("check", 13, "#15803d")} Parede Estrutural</span>'
             )
 
             with st.expander(f"Layer: {layer_name}", expanded=True):
@@ -324,7 +378,7 @@ with tab1:
                     col_m1.metric("Alta confiança", f"{r['paired_length_m']} m")
                     col_m2.metric("A revisar", f"{r['unpaired_length_m']} m")
 
-                    if st.button("🔍 Gerar overlay de conferência", key=f"overlay_{layer_name}"):
+                    if st.button("Gerar overlay de conferência", key=f"overlay_{layer_name}"):
                         png_path = os.path.join(tempfile.gettempdir(), f"overlay_{abs(hash(layer_name))}.png")
                         render_overlay_png(st.session_state.doc, layer_name, png_path)
                         st.session_state[f"png_{layer_name}"] = png_path
@@ -348,14 +402,14 @@ with tab1:
                     st.session_state.confirmed[layer_name] = confirmed
 
 # ----------------------------------------------------------------- Tab 2: Empresa & Cliente
-with tab2:
+def render_tab2():
     col_a, col_b = st.columns(2)
 
     with col_a:
         st.markdown(
-            """
+            f"""
             <div class="custom-card">
-                <div class="card-title">🏢 Empresa Contratada</div>
+                <div class="card-title-html">{icon("building", 18, "#0d9488")} Empresa Contratada</div>
             """,
             unsafe_allow_html=True,
         )
@@ -374,9 +428,9 @@ with tab2:
 
     with col_b:
         st.markdown(
-            """
+            f"""
             <div class="custom-card">
-                <div class="card-title">👤 Cliente Contratante</div>
+                <div class="card-title-html">{icon("user", 18, "#0d9488")} Cliente Contratante</div>
             """,
             unsafe_allow_html=True,
         )
@@ -388,11 +442,11 @@ with tab2:
         st.markdown("</div>", unsafe_allow_html=True)
 
 # ----------------------------------------------------------------- Tab 3: Condições & Gerar PDF
-with tab3:
+def render_tab3():
     st.markdown(
-        """
+        f"""
         <div class="custom-card">
-            <div class="card-title">💼 Condições Comerciais</div>
+            <div class="card-title-html">{icon("terms", 18, "#0d9488")} Condições Comerciais</div>
         """,
         unsafe_allow_html=True,
     )
@@ -434,9 +488,9 @@ with tab3:
     )
     st.markdown("</div>", unsafe_allow_html=True)
 
-    st.markdown('<div class="card-title">Emissão da Proposta em PDF</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="card-title-html">{icon("pdf", 18, "#0d9488")} Emissão da Proposta em PDF</div>', unsafe_allow_html=True)
 
-    if st.button("📄 Gerar Proposta Comercial em PDF", type="primary", use_container_width=True):
+    if st.button("Gerar Proposta Comercial em PDF", type="primary", use_container_width=True):
         if not st.session_state.summary:
             st.error("Faça o upload de uma planta baixa na Aba 1 antes de gerar a proposta.")
             st.stop()
@@ -474,7 +528,8 @@ with tab3:
             telefone=st.session_state.get("cli_tel", ""),
             email=st.session_state.get("cli_email", ""),
         )
-        project = Project(referencia_arquivo=uploaded.name if uploaded else "Projeto Arquitetônico")
+        uploaded_name = st.session_state.get("processed_file_key", "Projeto Arquitetônico").split("_")[0]
+        project = Project(referencia_arquivo=uploaded_name)
         terms = Terms(
             validade_dias=int(validade),
             forma_pagamento=pagamento,
@@ -489,14 +544,30 @@ with tab3:
             pdf_bytes = f.read()
 
         st.success(
-            f"🎉 Proposta gerada! Metragem: **{budget.total_length_m:.2f} m** | "
+            f"Proposta gerada com sucesso! Metragem: **{budget.total_length_m:.2f} m** | "
             f"Valor Total: **{format_brl(budget.total_value)}**"
         )
 
         st.download_button(
-            "⬇️ Baixar Proposta Comercial em PDF",
+            "Baixar Proposta Comercial em PDF",
             data=pdf_bytes,
             file_name=f"Proposta_FastBuild_{(st.session_state.get('cli_nome') or 'Cliente').replace(' ', '_')}.pdf",
             mime="application/pdf",
             use_container_width=True,
         )
+
+# Render View Based on Active Tab
+if HAS_OPTION_MENU:
+    if tab1_active:
+        render_tab1()
+    elif tab2_active:
+        render_tab2()
+    elif tab3_active:
+        render_tab3()
+else:
+    with tab1:
+        render_tab1()
+    with tab2:
+        render_tab2()
+    with tab3:
+        render_tab3()
