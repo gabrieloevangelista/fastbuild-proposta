@@ -6,6 +6,7 @@ import os
 import tempfile
 import urllib.request
 import json
+from PIL import Image
 
 import streamlit as st
 import ezdxf
@@ -27,6 +28,8 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="collapsed",
 )
+
+LOGO_SAVED_PATH = os.path.join(tempfile.gettempdir(), "custom_company_logo.png")
 
 # ----------------------------------------------------------------- CNPJ Auto-Complete Helper
 def fetch_cnpj_data(cnpj: str) -> dict:
@@ -84,11 +87,12 @@ def icon(name: str, size: int = 18, color: str = "currentColor") -> str:
         "warning": f'<svg xmlns="http://www.w3.org/2000/svg" width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" stroke="{color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 4px;"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
         "search": f'<svg xmlns="http://www.w3.org/2000/svg" width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" stroke="{color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 6px;"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>',
         "upload": f'<svg xmlns="http://www.w3.org/2000/svg" width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" stroke="{color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 6px;"><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="M12 12v9"/><path d="m16 16-4-4-4 4"/></svg>',
-        "pdf": f'<svg xmlns="http://www.w3.org/2000/svg" width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" stroke="{color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 6px;"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><path d="M10 12a1 1 0 0 0-1 1v4a1 1 0 0 0 1 1"/><path d="M10 12h2a1 1 0 0 1 1 1v1a1 1 0 0 1-1 1h-2"/><path d="M16 12h-2v6"/></svg>'
+        "pdf": f'<svg xmlns="http://www.w3.org/2000/svg" width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" stroke="{color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 6px;"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><path d="M10 12a1 1 0 0 0-1 1v4a1 1 0 0 0 1 1"/><path d="M10 12h2a1 1 0 0 1 1 1v1a1 1 0 0 1-1 1h-2"/><path d="M16 12h-2v6"/></svg>',
+        "gear": f'<svg xmlns="http://www.w3.org/2000/svg" width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" stroke="{color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 6px;"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>'
     }
     return icons.get(name, "")
 
-# ----------------------------------------------------------------- Custom Minimalist CSS
+# ----------------------------------------------------------------- Custom CSS
 st.markdown(
     """
     <style>
@@ -116,6 +120,12 @@ st.markdown(
         box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
     }
 
+    .header-logo-preview img {
+        max-height: 46px;
+        width: auto;
+        border-radius: 6px;
+    }
+
     .header-title-text {
         font-size: 22px;
         font-weight: 800;
@@ -132,7 +142,7 @@ st.markdown(
         margin-top: 2px;
     }
 
-    /* Custom Streamlit Tabs (Fallback if Option Menu not loaded) */
+    /* Custom Streamlit Tabs */
     .stTabs [data-baseweb="tab-list"] {
         gap: 8px;
         background-color: #ffffff;
@@ -249,12 +259,42 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# ----------------------------------------------------------------- Header Banner (Generic / White Label)
+# ----------------------------------------------------------------- Saved State & Settings Persistence
+if "saved_logo_path" not in st.session_state:
+    if os.path.exists(LOGO_SAVED_PATH):
+        st.session_state.saved_logo_path = LOGO_SAVED_PATH
+    else:
+        st.session_state.saved_logo_path = None
+
+if "default_company" not in st.session_state:
+    st.session_state.default_company = {
+        "nome": "",
+        "razao": "",
+        "cnpj": "",
+        "end": "",
+        "tel": "",
+        "wsp": "",
+        "email": "",
+    }
+
+# Render Header with Custom Saved Logo if available
+logo_header_html = ""
+if st.session_state.get("saved_logo_path") and os.path.exists(st.session_state.saved_logo_path):
+    try:
+        with open(st.session_state.saved_logo_path, "rb") as img_file:
+            enc = base64.b64encode(img_file.read()).decode()
+        logo_header_html = f'<div class="header-logo-preview"><img src="data:image/png;base64,{enc}" alt="Company Logo" /></div>'
+    except Exception:
+        pass
+
+company_display_title = st.session_state.default_company.get("nome") or "Orça Rápido Monolítico"
+
 st.markdown(
     f"""
     <div class="header-container">
+        {logo_header_html}
         <div>
-            <div class="header-title-text">{icon('ruler', 22, '#0d9488')} Orça Rápido Monolítico</div>
+            <div class="header-title-text">{icon('ruler', 22, '#0d9488')} {company_display_title}</div>
             <div class="header-subtitle">Medição Vetorial de Paredes em Painéis EPS & Orçamentos Automatizados</div>
         </div>
     </div>
@@ -274,10 +314,18 @@ if "included" not in st.session_state:
 if "processed_file_key" not in st.session_state:
     st.session_state.processed_file_key = None
 
-# Company default values in session state (open/editable by default)
-for comp_field in ["comp_nome", "comp_razao", "comp_cnpj", "comp_end", "comp_tel", "comp_wsp", "comp_email"]:
-    if comp_field not in st.session_state:
-        st.session_state[comp_field] = ""
+# Pre-fill company inputs from default_company settings if not present
+for comp_key, state_key in [
+    ("nome", "comp_nome"),
+    ("razao", "comp_razao"),
+    ("cnpj", "comp_cnpj"),
+    ("end", "comp_end"),
+    ("tel", "comp_tel"),
+    ("wsp", "comp_wsp"),
+    ("email", "comp_email"),
+]:
+    if state_key not in st.session_state or not st.session_state[state_key]:
+        st.session_state[state_key] = st.session_state.default_company.get(comp_key, "")
 
 # Client default values in session state
 for cli_field in ["cli_nome", "cli_doc", "cli_end", "cli_tel", "cli_email"]:
@@ -288,8 +336,8 @@ for cli_field in ["cli_nome", "cli_doc", "cli_end", "cli_tel", "cli_email"]:
 if HAS_OPTION_MENU:
     selected_tab = option_menu(
         menu_title=None,
-        options=["Planta & Medição", "Empresa & Cliente", "Condições & Gerar PDF"],
-        icons=["file-earmark-code", "building-gear", "file-earmark-pdf"],
+        options=["Planta & Medição", "Empresa & Cliente", "Condições & Gerar PDF", "Configurações"],
+        icons=["file-earmark-code", "building-gear", "file-earmark-pdf", "gear"],
         default_index=0,
         orientation="horizontal",
         styles={
@@ -302,13 +350,15 @@ if HAS_OPTION_MENU:
     tab1_active = (selected_tab == "Planta & Medição")
     tab2_active = (selected_tab == "Empresa & Cliente")
     tab3_active = (selected_tab == "Condições & Gerar PDF")
+    tab4_active = (selected_tab == "Configurações")
 else:
-    tab1, tab2, tab3 = st.tabs([
+    tab1, tab2, tab3, tab4 = st.tabs([
         "Planta & Medição",
         "Empresa & Cliente",
-        "Condições & Gerar PDF"
+        "Condições & Gerar PDF",
+        "Configurações"
     ])
-    tab1_active, tab2_active, tab3_active = True, True, True
+    tab1_active, tab2_active, tab3_active, tab4_active = True, True, True, True
 
 # ----------------------------------------------------------------- Tab 1: Planta & Medição
 def render_tab1():
@@ -319,7 +369,6 @@ def render_tab1():
         help="Arquivos DWG são convertidos automaticamente para DXF.",
     )
 
-    # Process upload ONLY ONCE per file (prevents constant reload on form edits)
     if uploaded is not None:
         file_key = f"{uploaded.name}_{uploaded.size}"
         if st.session_state.processed_file_key != file_key:
@@ -617,8 +666,12 @@ def render_tab3():
             observacoes=observacoes,
         )
 
+        logo_path_pdf = st.session_state.get("saved_logo_path")
+        if logo_path_pdf and not os.path.exists(logo_path_pdf):
+            logo_path_pdf = None
+
         out_path = os.path.join(tempfile.gettempdir(), "proposta_orcadamonolitico.pdf")
-        generate_proposal_pdf(out_path, company, client, project, budget, terms, logo_path=None)
+        generate_proposal_pdf(out_path, company, client, project, budget, terms, logo_path=logo_path_pdf)
 
         with open(out_path, "rb") as f:
             pdf_bytes = f.read()
@@ -637,6 +690,114 @@ def render_tab3():
             use_container_width=True,
         )
 
+# ----------------------------------------------------------------- Tab 4: Configurações (Logo & Dados Padrão)
+def render_tab4():
+    st.markdown(
+        f"""
+        <div class="custom-card">
+            <div class="card-title-html">{icon("gear", 18, "#0d9488")} Configurações da Empresa & Logotipo Padrão</div>
+            <p style="font-size: 13px; color: #64748b;">
+                Cadastre o logotipo e os dados padrão da sua empresa. As informações salvas aqui serão pré-carregadas automaticamente em todas as novas propostas e impressas no PDF.
+            </p>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    col_logo1, col_logo2 = st.columns([1, 2])
+    with col_logo1:
+        st.markdown("**Logotipo Atual:**")
+        if st.session_state.get("saved_logo_path") and os.path.exists(st.session_state.saved_logo_path):
+            st.image(st.session_state.saved_logo_path, width=160, caption="Logotipo Ativo para PDF")
+            if st.button("❌ Remover Logotipo", key="btn_remove_logo"):
+                if os.path.exists(st.session_state.saved_logo_path):
+                    os.remove(st.session_state.saved_logo_path)
+                st.session_state.saved_logo_path = None
+                st.success("Logotipo removido com sucesso!")
+                st.rerun()
+        else:
+            st.info("Nenhum logotipo cadastrado no momento. O cabeçalho dos PDFs utilizará o formato de texto.")
+
+    with col_logo2:
+        uploaded_logo = st.file_uploader(
+            "Upload do Logotipo da Empresa (.png, .jpg, .jpeg, .webp)",
+            type=["png", "jpg", "jpeg", "webp"],
+            key="logo_uploader",
+        )
+        if uploaded_logo is not None:
+            try:
+                img = Image.open(uploaded_logo)
+                img.save(LOGO_SAVED_PATH)
+                st.session_state.saved_logo_path = LOGO_SAVED_PATH
+                st.success("Logotipo salvo com sucesso! Ele será exibido em todas as propostas geradas.")
+                st.rerun()
+            except Exception as e:
+                st.error(f"Erro ao salvar a imagem do logotipo: {e}")
+
+    st.divider()
+    st.markdown('<div class="card-title-html">Dados Padrão da Empresa (Remetente)</div>', unsafe_allow_html=True)
+
+    cnpj_def_in = st.text_input(
+        "CNPJ da Empresa",
+        value=st.session_state.default_company.get("cnpj", ""),
+        placeholder="00.000.000/0001-00",
+        key="set_cnpj_in",
+    )
+
+    if st.button("🔍 Autopreencher Dados Padrão por CNPJ", key="btn_set_cnpj"):
+        if cnpj_def_in:
+            with st.spinner("Consultando dados da empresa via Receita..."):
+                fetched = fetch_cnpj_data(cnpj_def_in)
+                if fetched:
+                    st.session_state.default_company["razao"] = fetched["razao_social"]
+                    st.session_state.default_company["nome"] = fetched["nome_fantasia"]
+                    st.session_state.default_company["cnpj"] = fetched["cnpj"]
+                    st.session_state.default_company["end"] = fetched["endereco"]
+                    st.session_state.default_company["tel"] = fetched["telefone"]
+                    st.session_state.default_company["email"] = fetched["email"]
+                    
+                    # Also sync active company session values
+                    for k, v in [("nome", "comp_nome"), ("razao", "comp_razao"), ("cnpj", "comp_cnpj"), ("end", "comp_end"), ("tel", "comp_tel"), ("email", "comp_email")]:
+                        st.session_state[v] = st.session_state.default_company[k]
+                    
+                    st.success("Dados padrão da empresa carregados por CNPJ!")
+                    st.rerun()
+                else:
+                    st.error("Não foi possível consultar o CNPJ.")
+
+    col_s1, col_s2 = st.columns(2)
+    with col_s1:
+        def_nome = st.text_input("Nome Fantasia / Marca", value=st.session_state.default_company.get("nome", ""), key="set_nome")
+        def_razao = st.text_input("Razão Social", value=st.session_state.default_company.get("razao", ""), key="set_razao")
+        def_cnpj = st.text_input("CNPJ", value=st.session_state.default_company.get("cnpj", cnpj_def_in), key="set_cnpj")
+        def_end = st.text_input("Endereço da Sede", value=st.session_state.default_company.get("end", ""), key="set_end")
+    with col_s2:
+        def_tel = st.text_input("Telefone", value=st.session_state.default_company.get("tel", ""), key="set_tel")
+        def_wsp = st.text_input("WhatsApp", value=st.session_state.default_company.get("wsp", ""), key="set_wsp")
+        def_email = st.text_input("E-mail Comercial", value=st.session_state.default_company.get("email", ""), key="set_email")
+
+    if st.button("💾 Salvar Configurações Padrão da Empresa", type="primary", use_container_width=True):
+        st.session_state.default_company = {
+            "nome": def_nome,
+            "razao": def_razao,
+            "cnpj": def_cnpj,
+            "end": def_end,
+            "tel": def_tel,
+            "wsp": def_wsp,
+            "email": def_email,
+        }
+        # Update active fields as well
+        st.session_state["comp_nome"] = def_nome
+        st.session_state["comp_razao"] = def_razao
+        st.session_state["comp_cnpj"] = def_cnpj
+        st.session_state["comp_end"] = def_end
+        st.session_state["comp_tel"] = def_tel
+        st.session_state["comp_wsp"] = def_wsp
+        st.session_state["comp_email"] = def_email
+
+        st.success("🎉 Configurações salvas com sucesso! Os dados padrão serão carregados em todas as propostas.")
+
+    st.markdown("</div>", unsafe_allow_html=True)
+
 # Render View Based on Active Tab
 if HAS_OPTION_MENU:
     if tab1_active:
@@ -645,6 +806,8 @@ if HAS_OPTION_MENU:
         render_tab2()
     elif tab3_active:
         render_tab3()
+    elif tab4_active:
+        render_tab4()
 else:
     with tab1:
         render_tab1()
@@ -652,3 +815,5 @@ else:
         render_tab2()
     with tab3:
         render_tab3()
+    with tab4:
+        render_tab4()
