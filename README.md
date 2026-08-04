@@ -1,9 +1,9 @@
 <div align="center">
 
-# FastBuild — Proposta por Metragem de Parede
+# Orça Rápido Monolítico — Paredes em Painéis EPS
 
 <p align="center">
-  <b>Plataforma Inteligente para Medição de Paredes em Projetos CAD (DWG/DXF) & Emissão Automática de Propostas Comerciais em PDF</b>
+  <b>Plataforma Inteligente para Medição de Paredes em Painéis Monolíticos (EPS) & Emissão Automática de Propostas Comerciais em PDF</b>
 </p>
 
 ![Python](https://img.shields.io/badge/Python-3.11-3776AB?style=for-the-badge&logo=python&logoColor=white)
@@ -17,33 +17,19 @@
 
 ## 📌 Visão Geral
 
-O **FastBuild** é uma solução completa para automação de orçamentos de construção e reforma baseados na metragem linear de paredes. O sistema processa plantas baixas vetoriais em formatos **DWG** ou **DXF**, identifica a geometria das paredes por camadas (layers), separa o cálculo entre alta confiança e linhas a revisar, e gera automaticamente uma proposta comercial profissional em PDF com o cálculo:
+O **Orça Rápido Monolítico** é um sistema genérico e customizável para construtoras, empreiteiras e orçadores que trabalham com o sistema construtivo de **painéis monolíticos (EPS)**. O sistema lê plantas baixas vetoriais em formatos **DWG** ou **DXF**, calcula a metragem linear de parede por pavimento e gera propostas comerciais profissionais em PDF com o cálculo:
 
 $$\text{Valor Total (R\$)} = \text{Metragem Confirmada (m)} \times \text{Valor por Metro (R\$/m)}$$
 
 ---
 
-## ⚡ Fluxo de Funcionamento
+## ⚡ Funcionalidades Principais
 
-```mermaid
-flowchart LR
-    A[📁 Upload DWG/DXF] --> B[⚙️ LibreDWG Conversão]
-    B --> C[📐 Processamento Geométrico]
-    C --> D[🔍 Separação de Camadas & Eixo]
-    D --> E[📊 Reavaliação & Overlay Visual]
-    E --> F[📄 Emissão do PDF da Proposta]
-```
-
-1. **Upload & Conversão Nativa**: Envio da planta em `.dwg` ou `.dxf`. Arquivos `.dwg` são convertidos nativamente para `.dxf` usando o **LibreDWG 0.14**.
-2. **Extração Geométrica Inteligente**: O algoritmo analisa as entidades vetoriais (linhas, polilinhas e arcos) e classifica em:
-   - **Alta Confiança (Paredes Duplas)**: Identifica pares de linhas paralelas dentro da faixa de espessura de parede (5 cm a 40 cm) e constrói o eixo central (*centerline*).
-   - **A Revisar**: Traçados simples, hachuras ou símbolos que necessitam de conferência manual.
-3. **Conferência & Ajuste em Interface SaaS**: Exibição de métricas em tempo real (KPIs) e overlay de conferência (linhas verdes = detectadas, linhas vermelhas = a revisar).
-4. **Geração do PDF Comercial**: Emissão de documento PDF estilizado com os dados da empresa contratada, contratante e condições comerciais.
-
-> [!TIP]
-> **Por que incluir a etapa de conferência visual?**
-> Plantas CAD 2D são formadas por traçados vetoriais desprovidos de semântica BIM. A verificação visual permite ao orçador validar a metragem final com segurança antes que o valor seja convertido em proposta comercial.
+1. **White Label & Customizável**: Campos abertos para cadastro da empresa contratada (remetente) e do cliente contratante. Sem marcas ou logos fixas no sistema.
+2. **Autopreenchimento por CNPJ**: Integração com consulta da Receita Federal. Ao digitar o CNPJ da empresa ou do cliente, o sistema preenche automaticamente Razão Social, Nome Fantasia, Endereço, Telefone e E-mail.
+3. **Conversão Nativa DWG → DXF**: Suporte transparente a arquivos `.dwg` utilizando a biblioteca open-source **LibreDWG 0.14**.
+4. **Extração Geométrica Inteligente**: Algoritmo que identifica traçados de parede por camadas (layers) e classifica entre alta confiança e linhas a revisar.
+5. **Emissão de Propostas em PDF**: Geração de orçamentos estilizados prontos para download e assinatura.
 
 ---
 
@@ -51,23 +37,19 @@ flowchart LR
 
 ### 1. Rodando com Docker (Recomendado)
 
-O container Docker inclui a compilação do **LibreDWG 0.14**, garantindo suporte nativo a arquivos `.dwg` em qualquer sistema operacional.
-
 ```bash
 # 1. Construir a imagem Docker
-docker build -t fastbuild-app .
+docker build -t orca-rapido-monolitico .
 
 # 2. Executar o container na porta 8501
-docker run -p 8501:8501 fastbuild-app
+docker run -p 8501:8501 orca-rapido-monolitico
 ```
 
-Após iniciar, acesse no navegador: [`http://localhost:8501`](http://localhost:8501)
+Acesse no navegador: [`http://localhost:8501`](http://localhost:8501)
 
 ---
 
-### 2. Rodando Localmente (Sem Docker)
-
-Para execução local em ambiente Python:
+### 2. Rodando Localmente
 
 ```bash
 # Instalar dependências
@@ -77,32 +59,8 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
-> [!NOTE]
-> Para suporte a arquivos `.dwg` fora do Docker, certifique-se de ter o utilitário `dwg2dxf` do LibreDWG instalado e adicionado ao `PATH` do sistema.
-
----
-
-## 📂 Arquitetura e Estrutura de Arquivos
-
-| Arquivo | Descrição |
-| :--- | :--- |
-| [`app.py`](file:///c:/Users/Dell/Desktop/fastbuild_app_deploy_v2/fastbuild_app/app.py) | Interface principal em Streamlit com ícones outline SVG, abas e otimização de performance. |
-| [`wall_extract.py`](file:///c:/Users/Dell/Desktop/fastbuild_app_deploy_v2/fastbuild_app/wall_extract.py) | Motor geométrico de extração de paredes, cálculo de eixos e geração de overlays. |
-| [`dwg_convert.py`](file:///c:/Users/Dell/Desktop/fastbuild_app_deploy_v2/fastbuild_app/dwg_convert.py) | Wrapper Python para execução do binário `dwg2dxf` (LibreDWG). |
-| [`calc_engine.py`](file:///c:/Users/Dell/Desktop/fastbuild_app_deploy_v2/fastbuild_app/calc_engine.py) | Motor de regras de negócio para cálculo orçamentário. |
-| [`pdf_generator.py`](file:///c:/Users/Dell/Desktop/fastbuild_app_deploy_v2/fastbuild_app/pdf_generator.py) | Gerador de relatórios e propostas em PDF com ReportLab. |
-| [`Dockerfile`](file:///c:/Users/Dell/Desktop/fastbuild_app_deploy_v2/fastbuild_app/Dockerfile) | Multi-stage build contendo compilação C do LibreDWG e ambiente Python. |
-
----
-
-## ⚙️ Configurações & Regras de Negócio
-
-- **Valor Padrão por Metro**: Configurado inicialmente em `R$ 150,00/m` (editável via interface em tempo de execução).
-- **Filtro de Camadas**: O algoritmo filtra automaticamente camadas cujo nome contenha a palavra `"parede"` (ex: `PAREDE`, `ARQ_PAREDE`), sinalizando camadas de revestimento (`REV_PAREDE`) para atenção.
-- **Espessura de Parede**: Alcance de pareamento parametrizado entre `0.05m` (5 cm) e `0.40m` (40 cm).
-
 ---
 
 <div align="center">
-  <b>FastBuild App — Tecnologia & Eficiência para Orçamentos da Construção Civil</b>
+  <b>Orça Rápido Monolítico — Tecnologia & Automação para o Sistema Construtivo de Painéis EPS</b>
 </div>

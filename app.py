@@ -1,10 +1,11 @@
 """
-FastBuild — Calculadora de Instalação por Metragem de Parede
-================================================================
+Orça Rápido Monolítico — Calculadora de Instalação por Metragem de Parede em Painéis EPS
+======================================================================================
 """
 import os
 import tempfile
-import base64
+import urllib.request
+import json
 
 import streamlit as st
 import ezdxf
@@ -22,12 +23,53 @@ except ImportError:
     HAS_OPTION_MENU = False
 
 st.set_page_config(
-    page_title="FastBuild — Proposta por Metragem de Parede",
+    page_title="Orça Rápido Monolítico — Medição de Paredes EPS",
     layout="wide",
     initial_sidebar_state="collapsed",
 )
 
-LOGO_PATH = os.path.join(os.path.dirname(__file__), "assets", "fastbuild_logo.png")
+# ----------------------------------------------------------------- CNPJ Auto-Complete Helper
+def fetch_cnpj_data(cnpj: str) -> dict:
+    clean_cnpj = "".join(filter(str.isdigit, str(cnpj)))
+    if len(clean_cnpj) != 14:
+        return {}
+    
+    url = f"https://brasilapi.com.br/api/cnpj/v1/{clean_cnpj}"
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+    try:
+        with urllib.request.urlopen(req, timeout=5) as response:
+            if response.status == 200:
+                data = json.loads(response.read().decode("utf-8"))
+                logradouro = data.get("logradouro", "")
+                numero = data.get("numero", "")
+                bairro = data.get("bairro", "")
+                municipio = data.get("municipio", "")
+                uf = data.get("uf", "")
+                cep = data.get("cep", "")
+                
+                end_parts = []
+                if logradouro:
+                    end_parts.append(f"{logradouro}, {numero}".strip(", "))
+                if bairro:
+                    end_parts.append(bairro)
+                if municipio and uf:
+                    end_parts.append(f"{municipio}/{uf}")
+                if cep:
+                    end_parts.append(f"CEP {cep}")
+                    
+                full_address = " — ".join(end_parts)
+                
+                return {
+                    "razao_social": data.get("razao_social") or "",
+                    "nome_fantasia": data.get("nome_fantasia") or data.get("razao_social") or "",
+                    "cnpj": clean_cnpj,
+                    "endereco": full_address,
+                    "telefone": data.get("ddd_telefone_1") or "",
+                    "email": data.get("email") or "",
+                }
+    except Exception:
+        pass
+    return {}
 
 # ----------------------------------------------------------------- SVG Outline Icons Helper
 def icon(name: str, size: int = 18, color: str = "currentColor") -> str:
@@ -46,7 +88,7 @@ def icon(name: str, size: int = 18, color: str = "currentColor") -> str:
     }
     return icons.get(name, "")
 
-# ----------------------------------------------------------------- Custom Light Minimalist CSS
+# ----------------------------------------------------------------- Custom Minimalist CSS
 st.markdown(
     """
     <style>
@@ -61,23 +103,17 @@ st.markdown(
         color: #0f172a;
     }
 
-    /* Minimalist Light Header */
+    /* Minimalist White Label Header */
     .header-container {
         display: flex;
         align-items: center;
         gap: 16px;
         background: #ffffff;
-        padding: 16px 24px;
+        padding: 18px 24px;
         border-radius: 12px;
         border: 1px solid #e2e8f0;
         margin-bottom: 20px;
         box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
-    }
-    
-    .header-logo img {
-        height: 48px;
-        width: auto;
-        border-radius: 8px;
     }
 
     .header-title-text {
@@ -213,20 +249,13 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# ----------------------------------------------------------------- Header Banner (Light & Clean)
-logo_html = ""
-if os.path.exists(LOGO_PATH):
-    with open(LOGO_PATH, "rb") as image_file:
-        encoded_string = base64.b64encode(image_file.read()).decode()
-    logo_html = f'<div class="header-logo"><img src="data:image/png;base64,{encoded_string}" alt="FastBuild Logo" /></div>'
-
+# ----------------------------------------------------------------- Header Banner (Generic / White Label)
 st.markdown(
     f"""
     <div class="header-container">
-        {logo_html}
         <div>
-            <div class="header-title-text">{icon('ruler', 22, '#0d9488')} FastBuild Propostas</div>
-            <div class="header-subtitle">Medição Vetorial de Paredes em CAD (DWG/DXF) & Orçamentos Automatizados</div>
+            <div class="header-title-text">{icon('ruler', 22, '#0d9488')} Orça Rápido Monolítico</div>
+            <div class="header-subtitle">Medição Vetorial de Paredes em Painéis EPS & Orçamentos Automatizados</div>
         </div>
     </div>
     """,
@@ -244,6 +273,16 @@ if "included" not in st.session_state:
     st.session_state.included = {}
 if "processed_file_key" not in st.session_state:
     st.session_state.processed_file_key = None
+
+# Company default values in session state (open/editable by default)
+for comp_field in ["comp_nome", "comp_razao", "comp_cnpj", "comp_end", "comp_tel", "comp_wsp", "comp_email"]:
+    if comp_field not in st.session_state:
+        st.session_state[comp_field] = ""
+
+# Client default values in session state
+for cli_field in ["cli_nome", "cli_doc", "cli_end", "cli_tel", "cli_email"]:
+    if cli_field not in st.session_state:
+        st.session_state[cli_field] = ""
 
 # Navigation Menu
 if HAS_OPTION_MENU:
@@ -409,21 +448,36 @@ def render_tab2():
         st.markdown(
             f"""
             <div class="custom-card">
-                <div class="card-title-html">{icon("building", 18, "#0d9488")} Empresa Contratada</div>
+                <div class="card-title-html">{icon("building", 18, "#0d9488")} Empresa Contratada (Remetente)</div>
             """,
             unsafe_allow_html=True,
         )
-        company_nome = st.text_input("Nome fantasia", value="FastBuild", key="comp_nome")
-        company_razao = st.text_input("Razão social", value="RFB Reformas e Construções LTDA.", key="comp_razao")
-        company_cnpj = st.text_input("CNPJ", value="33.291.701/0001-86", key="comp_cnpj")
-        company_endereco = st.text_input(
-            "Endereço da sede",
-            value="Rua Rosa Gomes de Siqueira, 21 — Recanto Ana Maria, São Paulo/SP — CEP 04864-070",
-            key="comp_end",
-        )
-        company_tel = st.text_input("Telefone", value="(11) 5922-0510", key="comp_tel")
-        company_whatsapp = st.text_input("WhatsApp", value="(11) 97730-8919", key="comp_wsp")
-        company_email = st.text_input("E-mail comercial", value="contato@fastbuild.com.br", key="comp_email")
+        
+        comp_cnpj_in = st.text_input("CNPJ da Empresa", value=st.session_state.get("comp_cnpj", ""), placeholder="00.000.000/0001-00", key="input_comp_cnpj")
+        
+        if st.button("🔍 Autopreencher por CNPJ (Empresa)", key="btn_cnpj_comp"):
+            if comp_cnpj_in:
+                with st.spinner("Consultando dados da empresa via Receita..."):
+                    fetched = fetch_cnpj_data(comp_cnpj_in)
+                    if fetched:
+                        st.session_state["comp_razao"] = fetched["razao_social"]
+                        st.session_state["comp_nome"] = fetched["nome_fantasia"]
+                        st.session_state["comp_cnpj"] = fetched["cnpj"]
+                        st.session_state["comp_end"] = fetched["endereco"]
+                        st.session_state["comp_tel"] = fetched["telefone"]
+                        st.session_state["comp_email"] = fetched["email"]
+                        st.success("Dados da empresa carregados com sucesso!")
+                        st.rerun()
+                    else:
+                        st.error("Não foi possível consultar os dados para o CNPJ informado.")
+
+        company_nome = st.text_input("Nome fantasia / Marca", value=st.session_state.get("comp_nome", ""), placeholder="Ex: Monolítico Soluções", key="comp_nome")
+        company_razao = st.text_input("Razão social", value=st.session_state.get("comp_razao", ""), placeholder="Ex: Monolítico Construções LTDA", key="comp_razao")
+        company_cnpj = st.text_input("CNPJ confirmado", value=st.session_state.get("comp_cnpj", comp_cnpj_in), key="comp_cnpj")
+        company_endereco = st.text_input("Endereço da sede", value=st.session_state.get("comp_end", ""), placeholder="Rua, Número, Bairro - Cidade/UF", key="comp_end")
+        company_tel = st.text_input("Telefone", value=st.session_state.get("comp_tel", ""), placeholder="(11) 0000-0000", key="comp_tel")
+        company_whatsapp = st.text_input("WhatsApp", value=st.session_state.get("comp_wsp", ""), placeholder="(11) 90000-0000", key="comp_wsp")
+        company_email = st.text_input("E-mail comercial", value=st.session_state.get("comp_email", ""), placeholder="contato@empresa.com.br", key="comp_email")
         st.markdown("</div>", unsafe_allow_html=True)
 
     with col_b:
@@ -434,11 +488,29 @@ def render_tab2():
             """,
             unsafe_allow_html=True,
         )
-        client_nome = st.text_input("Nome do cliente", value="", placeholder="Ex: Construtora Silva", key="cli_nome")
-        client_doc = st.text_input("CPF / CNPJ", value="", placeholder="000.000.000-00", key="cli_doc")
-        client_endereco = st.text_input("Endereço da obra", value="", placeholder="Rua da Obra, 100 - São Paulo/SP", key="cli_end")
-        client_tel = st.text_input("Telefone", value="", placeholder="(11) 99999-9999", key="cli_tel")
-        client_email = st.text_input("E-mail", value="", placeholder="cliente@email.com", key="cli_email")
+        
+        cli_doc_in = st.text_input("CPF / CNPJ do Cliente", value=st.session_state.get("cli_doc", ""), placeholder="00.000.000/0001-00", key="input_cli_doc")
+        
+        if st.button("🔍 Autopreencher por CNPJ (Cliente)", key="btn_cnpj_cli"):
+            if cli_doc_in:
+                with st.spinner("Consultando dados do cliente..."):
+                    fetched = fetch_cnpj_data(cli_doc_in)
+                    if fetched:
+                        st.session_state["cli_nome"] = fetched["nome_fantasia"] or fetched["razao_social"]
+                        st.session_state["cli_doc"] = fetched["cnpj"]
+                        st.session_state["cli_end"] = fetched["endereco"]
+                        st.session_state["cli_tel"] = fetched["telefone"]
+                        st.session_state["cli_email"] = fetched["email"]
+                        st.success("Dados do cliente carregados com sucesso!")
+                        st.rerun()
+                    else:
+                        st.error("Não foi possível consultar os dados para o CNPJ informado.")
+
+        client_nome = st.text_input("Nome do cliente / empresa", value=st.session_state.get("cli_nome", ""), placeholder="Ex: Construtora Silva", key="cli_nome")
+        client_doc = st.text_input("CPF / CNPJ confirmado", value=st.session_state.get("cli_doc", cli_doc_in), key="cli_doc")
+        client_endereco = st.text_input("Endereço da obra", value=st.session_state.get("cli_end", ""), placeholder="Rua da Obra, 100 - São Paulo/SP", key="cli_end")
+        client_tel = st.text_input("Telefone", value=st.session_state.get("cli_tel", ""), placeholder="(11) 99999-9999", key="cli_tel")
+        client_email = st.text_input("E-mail", value=st.session_state.get("cli_email", ""), placeholder="cliente@email.com", key="cli_email")
         st.markdown("</div>", unsafe_allow_html=True)
 
 # ----------------------------------------------------------------- Tab 3: Condições & Gerar PDF
@@ -483,7 +555,7 @@ def render_tab3():
     observacoes = st.text_area(
         "Observações adicionais (opcional)",
         value="",
-        placeholder="Ex: Não inclui frete de materiais de terceiros.",
+        placeholder="Ex: Instalação de painéis monolíticos EPS conforme especificações técnicas do fabricante.",
         key="comm_obs",
     )
     st.markdown("</div>", unsafe_allow_html=True)
@@ -512,14 +584,15 @@ def render_tab3():
 
         budget = calculate_budget(floors, rate_per_meter=rate)
 
+        comp_nome_val = st.session_state.get("comp_nome") or "Orça Rápido Monolítico"
         company = Company(
-            razao_social=st.session_state.get("comp_razao", "RFB Reformas e Construções LTDA."),
-            nome_fantasia=st.session_state.get("comp_nome", "FastBuild"),
-            cnpj=st.session_state.get("comp_cnpj", "33.291.701/0001-86"),
-            endereco=st.session_state.get("comp_end", "Rua Rosa Gomes de Siqueira, 21 — São Paulo/SP"),
-            telefone=st.session_state.get("comp_tel", "(11) 5922-0510"),
-            whatsapp=st.session_state.get("comp_wsp", "(11) 97730-8919"),
-            email=st.session_state.get("comp_email", "contato@fastbuild.com.br"),
+            razao_social=st.session_state.get("comp_razao") or comp_nome_val,
+            nome_fantasia=comp_nome_val,
+            cnpj=st.session_state.get("comp_cnpj", ""),
+            endereco=st.session_state.get("comp_end", ""),
+            telefone=st.session_state.get("comp_tel", ""),
+            whatsapp=st.session_state.get("comp_wsp", ""),
+            email=st.session_state.get("comp_email", ""),
         )
         client = Client(
             nome=st.session_state.get("cli_nome") or "Cliente",
@@ -529,7 +602,14 @@ def render_tab3():
             email=st.session_state.get("cli_email", ""),
         )
         uploaded_name = st.session_state.get("processed_file_key", "Projeto Arquitetônico").split("_")[0]
-        project = Project(referencia_arquivo=uploaded_name)
+        project = Project(
+            titulo="Instalação de Painéis Monolíticos (EPS)",
+            descricao=(
+                "Serviço de instalação sobre a metragem linear de parede em painel monolítico (EPS) "
+                "identificada no projeto arquitetônico fornecido, conforme levantamento técnico descrito nesta proposta."
+            ),
+            referencia_arquivo=uploaded_name
+        )
         terms = Terms(
             validade_dias=int(validade),
             forma_pagamento=pagamento,
@@ -537,8 +617,8 @@ def render_tab3():
             observacoes=observacoes,
         )
 
-        out_path = os.path.join(tempfile.gettempdir(), "proposta_fastbuild.pdf")
-        generate_proposal_pdf(out_path, company, client, project, budget, terms, logo_path=LOGO_PATH)
+        out_path = os.path.join(tempfile.gettempdir(), "proposta_orcadamonolitico.pdf")
+        generate_proposal_pdf(out_path, company, client, project, budget, terms, logo_path=None)
 
         with open(out_path, "rb") as f:
             pdf_bytes = f.read()
@@ -548,10 +628,11 @@ def render_tab3():
             f"Valor Total: **{format_brl(budget.total_value)}**"
         )
 
+        cli_filename = (st.session_state.get('cli_nome') or 'Cliente').replace(' ', '_')
         st.download_button(
             "Baixar Proposta Comercial em PDF",
             data=pdf_bytes,
-            file_name=f"Proposta_FastBuild_{(st.session_state.get('cli_nome') or 'Cliente').replace(' ', '_')}.pdf",
+            file_name=f"Proposta_Monolitico_{cli_filename}.pdf",
             mime="application/pdf",
             use_container_width=True,
         )
