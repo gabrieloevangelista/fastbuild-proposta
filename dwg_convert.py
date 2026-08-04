@@ -39,9 +39,11 @@ def convert_dwg_to_dxf(dwg_path: str, dxf_path: str = None, timeout: int = 120) 
     if dxf_path is None:
         fd, dxf_path = tempfile.mkstemp(suffix=".dxf")
         os.close(fd)
+        if os.path.exists(dxf_path):
+            os.remove(dxf_path)
 
     result = subprocess.run(
-        [DWG2DXF_BIN, dwg_path, "-o", dxf_path],
+        [DWG2DXF_BIN, "-y", dwg_path, "-o", dxf_path],
         capture_output=True,
         text=True,
         timeout=timeout,
