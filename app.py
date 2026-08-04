@@ -1,4 +1,4 @@
-# Orça Rápido Monolítico — Calculadora de Instalação por Metragem de Parede & Área Total em Painéis EPS
+# Orça Rápido Monolítico — Calculadora de Área Construída (m²) & Instalação em Painéis EPS
 import os
 import tempfile
 import urllib.request
@@ -12,6 +12,7 @@ from wall_extract import summarize_all_wall_layers, render_overlay_png
 from dwg_convert import convert_dwg_to_dxf, dwg2dxf_available, DwgConversionError
 from calc_engine import FloorMeasurement, calculate_budget, format_brl, DEFAULT_RATE_PER_METER
 from pdf_generator import generate_proposal_pdf, Company, Client, Project, Terms
+from file_analyzers import analyze_dwg_dxf, analyze_pdf, analyze_image, merge_analysis_results
 
 # Try importing streamlit-option-menu for modern navigation
 try:
@@ -151,6 +152,8 @@ st.divider()
 # Initialize Session State
 if "doc" not in st.session_state:
     st.session_state.doc = None
+if "docs" not in st.session_state:
+    st.session_state.docs = []
 if "summary" not in st.session_state:
     st.session_state.summary = None
 if "confirmed" not in st.session_state:
@@ -161,6 +164,12 @@ if "included" not in st.session_state:
     st.session_state.included = {}
 if "processed_file_key" not in st.session_state:
     st.session_state.processed_file_key = None
+if "merged_images" not in st.session_state:
+    st.session_state.merged_images = []
+if "pdf_texts" not in st.session_state:
+    st.session_state.pdf_texts = ""
+if "source_files" not in st.session_state:
+    st.session_state.source_files = []
 
 # Pre-fill company inputs from default_company settings if not present
 for comp_key, state_key in [
@@ -210,51 +219,130 @@ else:
 
 # ----------------------------------------------------------------- Tab 1: Planta & Medição
 def render_tab1():
-    st.subheader("Upload da Planta Baixa (DWG / DXF)")
-    uploaded = st.file_uploader(
-        "Selecione o arquivo da planta (.dwg ou .dxf)",
-        type=["dwg", "dxf"],
-        help="Arquivos DWG são convertidos automaticamente para DXF via LibreDWG.",
+    st.subheader("📂 Upload de Arquivos do Projeto")
+    st.caption(
+        "Importe um ou mais arquivos para análise: **DWG/DXF** (planta baixa), "
+        "**PDF** (memorial, cotas) e **Imagens** (fotos, renders). "
+        "Os dados de todos os arquivos serão combinados automaticamente."
     )
 
-    if uploaded is not None:
-        file_key = f"{uploaded.name}_{uploaded.size}"
+    uploaded_files = st.file_uploader(
+        "Selecione os arquivos do projeto",
+        type=["dwg", "dxf", "pdf", "png", "jpg", "jpeg", "webp"],
+        accept_multiple_files=True,
+        help="DWG/DXF: planta baixa com extração automática de áreas e paredes. "
+             "PDF: extração de cotas e áreas do memorial descritivo. "
+             "IMG: referência visual para complementar a análise.",
+    )
+
+    if uploaded_files:
+        # Build a composite key from all files
+        file_key = "|".join(sorted(f"{f.name}_{f.size}" for f in uploaded_files))
+
         if st.session_state.processed_file_key != file_key:
-            suffix = "." + uploaded.name.rsplit(".", 1)[-1].lower()
-            with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-                tmp.write(uploaded.getvalue())
-                src_path = tmp.name
+            analysis_results = []
+            errors = []
+            progress_bar = st.progress(0, text="Analisando arquivos...")
 
-            dxf_path = src_path
-            if suffix == ".dwg":
-                if not dwg2dxf_available():
-                    st.error("Conversor DWG→DXF (LibreDWG) não encontrado neste ambiente.")
-                    st.stop()
-                with st.spinner("Convertendo arquivo DWG para DXF..."):
-                    try:
-                        dxf_path = convert_dwg_to_dxf(src_path)
-                    except DwgConversionError as e:
-                        st.error(str(e))
-                        st.stop()
+            for idx, uploaded in enumerate(uploaded_files):
+                suffix = "." + uploaded.name.rsplit(".", 1)[-1].lower()
+                with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+                    tmp.write(uploaded.getvalue())
+                    src_path = tmp.name
 
-            with st.spinner("Analisando camadas, áreas (m²) e paredes..."):
-                doc = ezdxf.readfile(dxf_path)
-                summary = summarize_all_wall_layers(doc)
+                file_type = suffix.lstrip(".")
+                progress_bar.progress(
+                    (idx + 1) / len(uploaded_files),
+                    text=f"Analisando: {uploaded.name} ({idx + 1}/{len(uploaded_files)})",
+                )
 
-            st.session_state.doc = doc
-            st.session_state.summary = summary
-            st.session_state.dxf_path = dxf_path
-            st.session_state.processed_file_key = file_key
-            st.session_state.confirmed = {}
-            st.session_state.confirmed_area = {}
-            st.session_state.included = {}
+                try:
+                    if file_type in ("dwg", "dxf"):
+                        result = analyze_dwg_dxf(src_path)
+                        # Keep first doc as legacy reference
+                        if st.session_state.doc is None:
+                            st.session_state.doc = result["doc"]
+                            st.session_state.dxf_path = result["dxf_path"]
+                        analysis_results.append(result)
 
-        if not st.session_state.summary:
-            st.warning("Nenhuma camada com geometria foi encontrada no arquivo CAD.")
+                    elif file_type == "pdf":
+                        result = analyze_pdf(src_path)
+                        analysis_results.append(result)
 
+                    elif file_type in ("png", "jpg", "jpeg", "webp"):
+                        result = analyze_image(src_path)
+                        analysis_results.append(result)
+
+                except DwgConversionError as e:
+                    errors.append(f"❌ {uploaded.name}: {str(e)}")
+                except Exception as e:
+                    errors.append(f"❌ {uploaded.name}: Erro ao processar — {str(e)}")
+
+            progress_bar.empty()
+
+            if errors:
+                for err in errors:
+                    st.error(err)
+
+            if analysis_results:
+                merged = merge_analysis_results(analysis_results)
+                st.session_state.summary = merged["layers"]
+                st.session_state.docs = merged["docs"]
+                st.session_state.merged_images = merged["images"]
+                st.session_state.pdf_texts = merged["pdf_texts"]
+                st.session_state.source_files = merged["source_files"]
+                st.session_state.processed_file_key = file_key
+                st.session_state.confirmed = {}
+                st.session_state.confirmed_area = {}
+                st.session_state.included = {}
+
+                # Show upload summary
+                n_dwg = sum(1 for r in analysis_results if r["type"] == "dwg")
+                n_pdf = sum(1 for r in analysis_results if r["type"] == "pdf")
+                n_img = sum(1 for r in analysis_results if r["type"] == "img")
+                parts = []
+                if n_dwg:
+                    parts.append(f"**{n_dwg}** DWG/DXF")
+                if n_pdf:
+                    parts.append(f"**{n_pdf}** PDF")
+                if n_img:
+                    parts.append(f"**{n_img}** Imagem(ns)")
+                st.success(f"✅ Arquivos processados: {', '.join(parts)}")
+            else:
+                st.warning("Nenhum arquivo pôde ser processado.")
+
+        if st.session_state.summary is not None and not st.session_state.summary:
+            st.warning("Nenhuma camada com geometria ou área foi encontrada nos arquivos.")
+
+    # ---- Images reference section ----
+    if st.session_state.merged_images:
+        st.divider()
+        st.subheader("🖼️ Imagens de Referência")
+        img_cols = st.columns(min(len(st.session_state.merged_images), 3))
+        for i, img_info in enumerate(st.session_state.merged_images):
+            with img_cols[i % len(img_cols)]:
+                st.image(
+                    img_info["path"],
+                    caption=f"{img_info['source_file']} ({img_info['width']}×{img_info['height']}px)",
+                    use_container_width=True,
+                )
+
+    # ---- PDF text extract section ----
+    if st.session_state.pdf_texts:
+        st.divider()
+        with st.expander("📄 Texto Extraído dos PDFs (referência)", expanded=False):
+            st.text_area(
+                "Conteúdo textual extraído",
+                value=st.session_state.pdf_texts,
+                height=200,
+                disabled=True,
+                key="pdf_text_display",
+            )
+
+    # ---- Main results section ----
     if st.session_state.summary:
         st.divider()
-        st.subheader("Resumo da Medição Automatizada (Área & Paredes)")
+        st.subheader("📐 Resumo — Área Construída (m²)")
 
         total_confirmed_area = 0.0
         total_auto_area = 0.0
@@ -270,23 +358,37 @@ def render_tab1():
                 area_val = r.get("area_m2", 0.0)
                 total_auto_area += area_val
                 total_confirmed_area += st.session_state.confirmed_area.get(layer_name, area_val)
-                total_high_conf += r["paired_length_m"]
-                total_review += r["unpaired_length_m"]
+                total_high_conf += r.get("paired_length_m", 0.0)
+                total_review += r.get("unpaired_length_m", 0.0)
 
-        # KPI Summary Native Columns
-        k1, k2, k3, k4 = st.columns(4)
-        k1.metric("Área Total Confirmada", f"{total_confirmed_area:.2f} m²")
-        k2.metric("Área Detectada (Auto)", f"{total_auto_area:.2f} m²")
-        k3.metric("Paredes Alta Confiança", f"{total_high_conf:.2f} m")
-        k4.metric("Linhas a Revisar", f"{total_review:.2f} m")
+        # KPI Summary — m² is the star
+        k1, k2, k3 = st.columns(3)
+        k1.metric("🏠 Área Construída Confirmada", f"{total_confirmed_area:.2f} m²")
+        k2.metric("📏 Área Detectada (Auto)", f"{total_auto_area:.2f} m²")
+        k3.metric("📁 Arquivos Analisados", f"{len(st.session_state.get('source_files', []))}")
+
+        if total_high_conf > 0 or total_review > 0:
+            st.caption(
+                f"ℹ️ Paredes detectadas: **{total_high_conf:.2f} m** (alta confiança) · "
+                f"**{total_review:.2f} m** (a revisar)"
+            )
 
         st.divider()
-        st.subheader("Camadas Identificadas")
+        st.subheader("Camadas / Fontes Identificadas")
         for layer_name, r in st.session_state.summary.items():
-            is_rev = "REV" in layer_name.upper()
-            badge_label = "Revestimento (Revisar)" if is_rev else "Geometria Estrutural"
+            source_type = r.get("source", "DWG")
+            if source_type == "DWG":
+                icon = "🏗️"
+            elif source_type == "PDF":
+                icon = "📄"
+            else:
+                icon = "📐"
 
-            with st.expander(f"Layer: {layer_name} ({badge_label})", expanded=True):
+            is_rev = "REV" in layer_name.upper()
+            source_label = f"Fonte: {source_type}"
+            badge_label = "Revestimento (Revisar)" if is_rev else source_label
+
+            with st.expander(f"{icon} {layer_name} — {badge_label}", expanded=True):
                 included = st.checkbox(
                     "Incluir no cálculo da proposta",
                     value=st.session_state.included.get(layer_name, True),
@@ -296,27 +398,47 @@ def render_tab1():
 
                 c1, c2 = st.columns([1.2, 1])
                 with c1:
-                    col_m1, col_m2, col_m3 = st.columns(3)
-                    col_m1.metric("Área Estimada", f"{r.get('area_m2', 0.0):.2f} m²")
-                    col_m2.metric("Paredes (Pares)", f"{r['paired_length_m']} m")
-                    col_m3.metric("Paredes (Revisar)", f"{r['unpaired_length_m']} m")
+                    area_m2 = r.get("area_m2", 0.0)
+                    st.metric("Área Construída Estimada", f"{area_m2:.2f} m²")
 
-                    if st.button("Gerar overlay de conferência", key=f"overlay_{layer_name}"):
-                        png_path = os.path.join(tempfile.gettempdir(), f"overlay_{abs(hash(layer_name))}.png")
-                        render_overlay_png(st.session_state.doc, layer_name, png_path)
-                        st.session_state[f"png_{layer_name}"] = png_path
+                    if source_type == "DWG":
+                        col_m1, col_m2 = st.columns(2)
+                        col_m1.metric("Paredes (Pares)", f"{r.get('paired_length_m', 0.0)} m")
+                        col_m2.metric("Paredes (Revisar)", f"{r.get('unpaired_length_m', 0.0)} m")
 
-                    if st.session_state.get(f"png_{layer_name}"):
-                        st.image(
-                            st.session_state[f"png_{layer_name}"],
-                            caption="Legenda: Verde = Pares | Vermelho = Linhas A Revisar",
-                            use_container_width=True,
-                        )
+                        # Overlay button — only for DWG layers
+                        original_layer = r.get("original_layer", layer_name)
+                        doc_index = r.get("doc_index", 0)
+                        overlay_doc = None
+                        if st.session_state.docs and doc_index < len(st.session_state.docs):
+                            overlay_doc = st.session_state.docs[doc_index]
+                        elif st.session_state.doc is not None:
+                            overlay_doc = st.session_state.doc
+
+                        if overlay_doc and st.button("Gerar overlay de conferência", key=f"overlay_{layer_name}"):
+                            png_path = os.path.join(
+                                tempfile.gettempdir(),
+                                f"overlay_{abs(hash(layer_name))}.png",
+                            )
+                            render_overlay_png(overlay_doc, original_layer, png_path)
+                            st.session_state[f"png_{layer_name}"] = png_path
+
+                        if st.session_state.get(f"png_{layer_name}"):
+                            st.image(
+                                st.session_state[f"png_{layer_name}"],
+                                caption="Legenda: Verde = Pares | Vermelho = Linhas A Revisar",
+                                use_container_width=True,
+                            )
+
+                    elif source_type == "PDF":
+                        areas_on_page = r.get("areas_found_on_page", [])
+                        if areas_on_page:
+                            st.caption(f"Áreas encontradas no texto: {', '.join(f'{a:.2f} m²' for a in areas_on_page)}")
 
                 with c2:
                     default_area_val = float(r.get("area_m2", 0.0))
                     confirmed_area = st.number_input(
-                        "Área total confirmada para a proposta (m²)",
+                        "Área construída confirmada (m²)",
                         min_value=0.0,
                         value=float(st.session_state.confirmed_area.get(layer_name, default_area_val)),
                         step=0.5,
@@ -324,15 +446,16 @@ def render_tab1():
                     )
                     st.session_state.confirmed_area[layer_name] = confirmed_area
 
-                    default_len_val = r["paired_length_m"]
-                    confirmed_len = st.number_input(
-                        "Metragem linear de parede (m)",
-                        min_value=0.0,
-                        value=float(st.session_state.confirmed.get(layer_name, default_len_val)),
-                        step=0.5,
-                        key=f"confirm_{layer_name}",
-                    )
-                    st.session_state.confirmed[layer_name] = confirmed_len
+                    if source_type == "DWG":
+                        default_len_val = r.get("paired_length_m", 0.0)
+                        confirmed_len = st.number_input(
+                            "Metragem linear de parede (m) — referência",
+                            min_value=0.0,
+                            value=float(st.session_state.confirmed.get(layer_name, default_len_val)),
+                            step=0.5,
+                            key=f"confirm_{layer_name}",
+                        )
+                        st.session_state.confirmed[layer_name] = confirmed_len
 
 # ----------------------------------------------------------------- Tab 2: Empresa & Cliente
 def render_tab2():
@@ -444,10 +567,10 @@ def render_tab3():
         floors = [
             FloorMeasurement(
                 name=layer_name.split("_")[-1] if "_" in layer_name else layer_name,
-                confirmed_length_m=st.session_state.confirmed.get(layer_name, r["paired_length_m"]),
+                confirmed_length_m=st.session_state.confirmed.get(layer_name, r.get("paired_length_m", 0.0)),
                 confirmed_area_m2=st.session_state.confirmed_area.get(layer_name, r.get("area_m2", 0.0)),
-                auto_high_confidence_m=r["paired_length_m"],
-                auto_needs_review_m=r["unpaired_length_m"],
+                auto_high_confidence_m=r.get("paired_length_m", 0.0),
+                auto_needs_review_m=r.get("unpaired_length_m", 0.0),
                 auto_area_m2=r.get("area_m2", 0.0),
             )
             for layer_name, r in st.session_state.summary.items()
@@ -477,12 +600,17 @@ def render_tab3():
             telefone=st.session_state.get("cli_tel", ""),
             email=st.session_state.get("cli_email", ""),
         )
-        uploaded_name = st.session_state.get("processed_file_key", "Projeto Arquitetônico").split("_")[0]
+        source_files_list = st.session_state.get("source_files", [])
+        if source_files_list:
+            uploaded_name = ", ".join(source_files_list)
+        else:
+            uploaded_name = st.session_state.get("processed_file_key", "Projeto Arquitetônico").split("_")[0]
         project = Project(
             titulo="Instalação de Painéis Monolíticos (EPS)",
             descricao=(
-                "Serviço de instalação sobre a área total calculada do projeto arquitetônico fornecido (m²), "
-                "conforme levantamento técnico e medição de área descritos nesta proposta."
+                "Serviço de instalação sobre a área total construída calculada a partir dos arquivos "
+                "do projeto fornecidos (m²), conforme levantamento técnico e medição de área "
+                "descritos nesta proposta."
             ),
             referencia_arquivo=uploaded_name
         )
