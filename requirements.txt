@@ -1,0 +1,6 @@
+streamlit==1.60.0
+ezdxf==1.4.4
+reportlab==4.5.1
+matplotlib
+Pillow
+numpy
