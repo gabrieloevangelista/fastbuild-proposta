@@ -11,7 +11,7 @@ RUN curl -sL -o libredwg.tar.xz \
 
 WORKDIR /build/libredwg-0.14
 RUN ./configure --prefix=/opt/libredwg \
-        --disable-bindings --disable-static --disable-json --disable-docs \
+        --disable-bindings --disable-static --disable-docs \
     && make -j"$(nproc)" \
     && make install
 
