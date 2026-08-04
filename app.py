@@ -6,6 +6,7 @@ import os
 import tempfile
 import urllib.request
 import json
+import textwrap
 from PIL import Image
 
 import streamlit as st
@@ -94,7 +95,7 @@ def icon(name: str, size: int = 18, color: str = "currentColor") -> str:
 
 # ----------------------------------------------------------------- Custom CSS
 st.markdown(
-    """
+    textwrap.dedent("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 
@@ -255,7 +256,7 @@ st.markdown(
         background: #0f766e;
     }
     </style>
-    """,
+    """),
     unsafe_allow_html=True,
 )
 
@@ -290,7 +291,7 @@ if st.session_state.get("saved_logo_path") and os.path.exists(st.session_state.s
 company_display_title = st.session_state.default_company.get("nome") or "Orça Rápido Monolítico"
 
 st.markdown(
-    f"""
+    textwrap.dedent(f"""
     <div class="header-container">
         {logo_header_html}
         <div>
@@ -298,7 +299,7 @@ st.markdown(
             <div class="header-subtitle">Medição Vetorial de Paredes em Painéis EPS & Orçamentos Automatizados</div>
         </div>
     </div>
-    """,
+    """),
     unsafe_allow_html=True,
 )
 
@@ -423,7 +424,7 @@ def render_tab1():
 
         # KPI Summary Grid
         st.markdown(
-            f"""
+            textwrap.dedent(f"""
             <div class="kpi-grid">
                 <div class="kpi-card kpi-card-teal">
                     <div class="kpi-label">Metragem Total Confirmada</div>
@@ -438,7 +439,7 @@ def render_tab1():
                     <div class="kpi-value">{total_review:.2f} m</div>
                 </div>
             </div>
-            """,
+            """),
             unsafe_allow_html=True,
         )
 
@@ -495,10 +496,10 @@ def render_tab2():
 
     with col_a:
         st.markdown(
-            f"""
+            textwrap.dedent(f"""
             <div class="custom-card">
                 <div class="card-title-html">{icon("building", 18, "#0d9488")} Empresa Contratada (Remetente)</div>
-            """,
+            """),
             unsafe_allow_html=True,
         )
         
@@ -531,10 +532,10 @@ def render_tab2():
 
     with col_b:
         st.markdown(
-            f"""
+            textwrap.dedent(f"""
             <div class="custom-card">
                 <div class="card-title-html">{icon("user", 18, "#0d9488")} Cliente Contratante</div>
-            """,
+            """),
             unsafe_allow_html=True,
         )
         
@@ -565,10 +566,10 @@ def render_tab2():
 # ----------------------------------------------------------------- Tab 3: Condições & Gerar PDF
 def render_tab3():
     st.markdown(
-        f"""
+        textwrap.dedent(f"""
         <div class="custom-card">
             <div class="card-title-html">{icon("terms", 18, "#0d9488")} Condições Comerciais</div>
-        """,
+        """),
         unsafe_allow_html=True,
     )
 
@@ -693,13 +694,13 @@ def render_tab3():
 # ----------------------------------------------------------------- Tab 4: Configurações (Logo & Dados Padrão)
 def render_tab4():
     st.markdown(
-        f"""
+        textwrap.dedent(f"""
         <div class="custom-card">
             <div class="card-title-html">{icon("gear", 18, "#0d9488")} Configurações da Empresa & Logotipo Padrão</div>
             <p style="font-size: 13px; color: #64748b;">
                 Cadastre o logotipo e os dados padrão da sua empresa. As informações salvas aqui serão pré-carregadas automaticamente em todas as novas propostas e impressas no PDF.
             </p>
-        """,
+        """),
         unsafe_allow_html=True,
     )
 
