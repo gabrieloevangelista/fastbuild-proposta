@@ -51,56 +51,37 @@ if "default_company" not in st.session_state:
 
 theme_color = st.session_state.theme_color
 
-# ----------------------------------------------------------------- Dynamic CSS with Bootstrap Icons
-st.markdown(
-    f"""
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-    <style>
-    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+# ----------------------------------------------------------------- Dynamic Custom CSS
+_css = """
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 
-    html, body, [class*="css"] {{
-        font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
-    }}
+html, body, [class*="css"] {
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+}
 
-    .stApp {{
-        background-color: #f8fafc;
-        color: #0f172a;
-    }}
+.stApp {
+    background-color: #f8fafc;
+    color: #0f172a;
+}
 
-    /* Dynamic Primary Theme Color for Buttons */
-    .stButton>button[kind="primary"] {{
-        background-color: {theme_color} !important;
-        border: none !important;
-        color: #ffffff !important;
-        font-weight: 700 !important;
-        box-shadow: 0 4px 12px {theme_color}33 !important;
-        border-radius: 8px !important;
-        transition: all 0.2s ease-in-out;
-    }}
-    
-    .stButton>button[kind="primary"]:hover {{
-        filter: brightness(0.9) !important;
-        transform: translateY(-1px) !important;
-    }}
+.stButton>button[kind="primary"] {
+    background-color: """ + theme_color + """ !important;
+    border: none !important;
+    color: #ffffff !important;
+    font-weight: 700 !important;
+    box-shadow: 0 4px 12px """ + theme_color + """33 !important;
+    border-radius: 8px !important;
+    transition: all 0.2s ease-in-out;
+}
 
-    .stMetric label {{
-        color: #64748b !important;
-        font-weight: 600 !important;
-    }}
-    
-    .stMetric .stMetricValue {{
-        color: {theme_color} !important;
-        font-weight: 800 !important;
-    }}
-
-    .section-icon {{
-        color: {theme_color};
-        margin-right: 8px;
-    }}
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
+.stButton>button[kind="primary"]:hover {
+    filter: brightness(0.9) !important;
+    transform: translateY(-1px) !important;
+}
+</style>
+"""
+st.markdown(_css, unsafe_allow_html=True)
 
 # ----------------------------------------------------------------- CNPJ Auto-Complete Helper
 def fetch_cnpj_data(cnpj: str) -> dict:
@@ -167,10 +148,7 @@ with st.container():
                 st.session_state.saved_logo_path = None
     with c_title:
         display_title = st.session_state.default_company.get("nome") or "Orça Rápido Monolítico"
-        st.markdown(
-            f"<h2><i class='bi bi-bounding-box-circles section-icon'></i>{display_title}</h2>",
-            unsafe_allow_html=True,
-        )
+        st.title(display_title)
         st.caption("Medição Vetorial de Área Total (m²) & Paredes em Painéis EPS — Orçamentos Automatizados")
 
 st.divider()
@@ -237,7 +215,7 @@ else:
 
 # ----------------------------------------------------------------- Tab 1: Planta & Medição
 def render_tab1():
-    st.markdown(f"### <i class='bi bi-folder-symlink section-icon'></i>Upload da Planta Baixa (DWG / DXF)", unsafe_allow_html=True)
+    st.subheader("Upload da Planta Baixa (DWG / DXF)")
     uploaded = st.file_uploader(
         "Selecione o arquivo da planta (.dwg ou .dxf)",
         type=["dwg", "dxf"],
@@ -281,7 +259,7 @@ def render_tab1():
 
     if st.session_state.summary:
         st.divider()
-        st.markdown(f"### <i class='bi bi-bar-chart-line section-icon'></i>Resumo da Medição Automatizada (Área & Paredes)", unsafe_allow_html=True)
+        st.subheader("Resumo da Medição Automatizada (Área & Paredes)")
 
         total_confirmed_area = 0.0
         total_auto_area = 0.0
@@ -308,7 +286,7 @@ def render_tab1():
         k4.metric("Linhas a Revisar", f"{total_review:.2f} m")
 
         st.divider()
-        st.markdown(f"### <i class='bi bi-bricks section-icon'></i>Camadas Identificadas", unsafe_allow_html=True)
+        st.subheader("Camadas Identificadas")
         for layer_name, r in st.session_state.summary.items():
             is_rev = "REV" in layer_name.upper()
             badge_label = "Revestimento (Revisar)" if is_rev else "Geometria Estrutural"
@@ -366,7 +344,7 @@ def render_tab2():
     col_a, col_b = st.columns(2)
 
     with col_a:
-        st.markdown(f"### <i class='bi bi-building section-icon'></i>Empresa Contratada (Remetente)", unsafe_allow_html=True)
+        st.subheader("Empresa Contratada (Remetente)")
         
         comp_cnpj_in = st.text_input("CNPJ da Empresa", value=st.session_state.get("comp_cnpj", ""), placeholder="00.000.000/0001-00", key="input_comp_cnpj")
         
@@ -395,7 +373,7 @@ def render_tab2():
         company_email = st.text_input("E-mail comercial", value=st.session_state.get("comp_email", ""), placeholder="contato@empresa.com.br", key="comp_email")
 
     with col_b:
-        st.markdown(f"### <i class='bi bi-person-badge section-icon'></i>Cliente Contratante", unsafe_allow_html=True)
+        st.subheader("Cliente Contratante")
         
         cli_doc_in = st.text_input("CPF / CNPJ do Cliente", value=st.session_state.get("cli_doc", ""), placeholder="00.000.000/0001-00", key="input_cli_doc")
         
@@ -422,7 +400,7 @@ def render_tab2():
 
 # ----------------------------------------------------------------- Tab 3: Condições & Gerar PDF
 def render_tab3():
-    st.markdown(f"### <i class='bi bi-briefcase section-icon'></i>Condições Comerciais", unsafe_allow_html=True)
+    st.subheader("Condições Comerciais")
 
     col_c, col_d, col_e = st.columns(3)
     with col_c:
@@ -461,7 +439,7 @@ def render_tab3():
     )
 
     st.divider()
-    st.markdown(f"### <i class='bi bi-file-earmark-pdf section-icon'></i>Emissão da Proposta em PDF", unsafe_allow_html=True)
+    st.subheader("Emissão da Proposta em PDF")
 
     if st.button("Gerar Proposta Comercial em PDF", type="primary", use_container_width=True):
         if not st.session_state.summary:
@@ -546,7 +524,7 @@ def render_tab3():
 
 # ----------------------------------------------------------------- Tab 4: Configurações & Personalização do Tema
 def render_tab4():
-    st.markdown(f"### <i class='bi bi-palette section-icon'></i>Personalização do Tema & Cores da Aplicação", unsafe_allow_html=True)
+    st.subheader("Personalização do Tema & Cores da Aplicação")
     st.caption("Altere a cor principal da marca do aplicativo. A cor selecionada será aplicada aos botões, métricas e elementos de destaque.")
 
     col_thm1, col_thm2 = st.columns([1, 2])
@@ -573,7 +551,7 @@ def render_tab4():
             chosen_color = hex_code
 
     st.divider()
-    st.markdown(f"### <i class='bi bi-image section-icon'></i>Logotipo Padrão da Empresa", unsafe_allow_html=True)
+    st.subheader("Logotipo Padrão da Empresa")
     st.caption("Cadastre o logotipo e os dados padrão da sua empresa. As informações salvas serão pré-carregadas em todas as propostas.")
 
     col_logo1, col_logo2 = st.columns([1, 2])
@@ -607,7 +585,7 @@ def render_tab4():
                 st.error(f"Erro ao salvar a imagem do logotipo: {e}")
 
     st.divider()
-    st.markdown(f"### <i class='bi bi-building-gear section-icon'></i>Dados Padrão da Empresa (Remetente)", unsafe_allow_html=True)
+    st.subheader("Dados Padrão da Empresa (Remetente)")
 
     cnpj_def_in = st.text_input(
         "CNPJ da Empresa",
