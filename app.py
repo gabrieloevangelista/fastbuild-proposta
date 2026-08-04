@@ -145,7 +145,7 @@ with st.container():
     with c_title:
         display_title = st.session_state.default_company.get("nome") or "Orça Rápido Monolítico"
         st.title(f"📐 {display_title}")
-        st.caption("Medição Vetorial de Paredes em Painéis EPS & Orçamentos Automatizados")
+        st.caption("Medição Vetorial de Área Total (m²) & Paredes em Painéis EPS — Orçamentos Automatizados")
 
 st.divider()
 
@@ -156,6 +156,8 @@ if "summary" not in st.session_state:
     st.session_state.summary = None
 if "confirmed" not in st.session_state:
     st.session_state.confirmed = {}
+if "confirmed_area" not in st.session_state:
+    st.session_state.confirmed_area = {}
 if "included" not in st.session_state:
     st.session_state.included = {}
 if "processed_file_key" not in st.session_state:
@@ -236,7 +238,7 @@ def render_tab1():
                         st.error(str(e))
                         st.stop()
 
-            with st.spinner("Analisando camadas e medindo paredes..."):
+            with st.spinner("Analisando camadas, áreas (m²) e paredes..."):
                 doc = ezdxf.readfile(dxf_path)
                 summary = summarize_all_wall_layers(doc)
 
@@ -245,16 +247,18 @@ def render_tab1():
             st.session_state.dxf_path = dxf_path
             st.session_state.processed_file_key = file_key
             st.session_state.confirmed = {}
+            st.session_state.confirmed_area = {}
             st.session_state.included = {}
 
         if not st.session_state.summary:
-            st.warning("Nenhuma camada contendo 'parede' no nome foi encontrada. Verifique as camadas do arquivo CAD.")
+            st.warning("Nenhuma camada contendo geometria foi encontrada no arquivo CAD.")
 
     if st.session_state.summary:
         st.divider()
-        st.subheader("📊 Resumo da Medição Automatizada")
+        st.subheader("📊 Resumo da Medição Automatizada (Área & Paredes)")
 
-        total_confirmed = 0.0
+        total_confirmed_area = 0.0
+        total_auto_area = 0.0
         total_high_conf = 0.0
         total_review = 0.0
 
@@ -264,21 +268,24 @@ def render_tab1():
                 st.session_state.included[layer_name] = default_include
 
             if st.session_state.included[layer_name]:
+                area_val = r.get("area_m2", 0.0)
+                total_auto_area += area_val
+                total_confirmed_area += st.session_state.confirmed_area.get(layer_name, area_val)
                 total_high_conf += r["paired_length_m"]
                 total_review += r["unpaired_length_m"]
-                total_confirmed += st.session_state.confirmed.get(layer_name, r["paired_length_m"])
 
         # KPI Summary Native Columns
-        k1, k2, k3 = st.columns(3)
-        k1.metric("Metragem Total Confirmada", f"{total_confirmed:.2f} m")
-        k2.metric("Alta Confiança (Duplas)", f"{total_high_conf:.2f} m")
-        k3.metric("Linhas a Revisar", f"{total_review:.2f} m")
+        k1, k2, k3, k4 = st.columns(4)
+        k1.metric("Área Total Confirmada", f"{total_confirmed_area:.2f} m²")
+        k2.metric("Área Detectada (Auto)", f"{total_auto_area:.2f} m²")
+        k3.metric("Paredes Alta Confiança", f"{total_high_conf:.2f} m")
+        k4.metric("Linhas a Revisar", f"{total_review:.2f} m")
 
         st.divider()
-        st.subheader("🧱 Camadas de Parede Identificadas")
+        st.subheader("🧱 Camadas Identificadas")
         for layer_name, r in st.session_state.summary.items():
             is_rev = "REV" in layer_name.upper()
-            badge_label = "⚠️ Revestimento" if is_rev else "✓ Parede Estrutural"
+            badge_label = "⚠️ Revestimento" if is_rev else "✓ Geometria / Parede"
 
             with st.expander(f"Layer: {layer_name} ({badge_label})", expanded=True):
                 included = st.checkbox(
@@ -290,9 +297,10 @@ def render_tab1():
 
                 c1, c2 = st.columns([1.2, 1])
                 with c1:
-                    col_m1, col_m2 = st.columns(2)
-                    col_m1.metric("Alta confiança", f"{r['paired_length_m']} m")
-                    col_m2.metric("A revisar", f"{r['unpaired_length_m']} m")
+                    col_m1, col_m2, col_m3 = st.columns(3)
+                    col_m1.metric("Área Estimada", f"{r.get('area_m2', 0.0):.2f} m²")
+                    col_m2.metric("Paredes (Pares)", f"{r['paired_length_m']} m")
+                    col_m3.metric("Paredes (Revisar)", f"{r['unpaired_length_m']} m")
 
                     if st.button("🔍 Gerar overlay de conferência", key=f"overlay_{layer_name}"):
                         png_path = os.path.join(tempfile.gettempdir(), f"overlay_{abs(hash(layer_name))}.png")
@@ -307,15 +315,26 @@ def render_tab1():
                         )
 
                 with c2:
-                    default_val = r["paired_length_m"]
-                    confirmed = st.number_input(
-                        "Metragem confirmada para a proposta (m)",
+                    default_area_val = float(r.get("area_m2", 0.0))
+                    confirmed_area = st.number_input(
+                        "Área total confirmada para a proposta (m²)",
                         min_value=0.0,
-                        value=float(st.session_state.confirmed.get(layer_name, default_val)),
+                        value=float(st.session_state.confirmed_area.get(layer_name, default_area_val)),
+                        step=0.5,
+                        key=f"confirm_area_{layer_name}",
+                    )
+                    st.session_state.confirmed_area[layer_name] = confirmed_area
+
+                    default_len_val = r["paired_length_m"]
+                    confirmed_len = st.number_input(
+                        "Metragem linear de parede (m)",
+                        min_value=0.0,
+                        value=float(st.session_state.confirmed.get(layer_name, default_len_val)),
                         step=0.5,
                         key=f"confirm_{layer_name}",
                     )
-                    st.session_state.confirmed[layer_name] = confirmed
+                    st.session_state.confirmed[layer_name] = confirmed_len
+
 
 # ----------------------------------------------------------------- Tab 2: Empresa & Cliente
 def render_tab2():
@@ -383,7 +402,7 @@ def render_tab3():
     col_c, col_d, col_e = st.columns(3)
     with col_c:
         rate = st.number_input(
-            "Valor por metro (R$/m)",
+            "Valor por m² (R$/m²)",
             min_value=0.0,
             value=DEFAULT_RATE_PER_METER,
             step=5.0,
@@ -428,15 +447,17 @@ def render_tab3():
             FloorMeasurement(
                 name=layer_name.split("_")[-1] if "_" in layer_name else layer_name,
                 confirmed_length_m=st.session_state.confirmed.get(layer_name, r["paired_length_m"]),
+                confirmed_area_m2=st.session_state.confirmed_area.get(layer_name, r.get("area_m2", 0.0)),
                 auto_high_confidence_m=r["paired_length_m"],
                 auto_needs_review_m=r["unpaired_length_m"],
+                auto_area_m2=r.get("area_m2", 0.0),
             )
             for layer_name, r in st.session_state.summary.items()
             if st.session_state.included.get(layer_name, True)
         ]
 
         if not floors:
-            st.error("Nenhuma camada de parede incluída no total.")
+            st.error("Nenhuma camada de parede/área incluída no total.")
             st.stop()
 
         budget = calculate_budget(floors, rate_per_meter=rate)
@@ -462,8 +483,8 @@ def render_tab3():
         project = Project(
             titulo="Instalação de Painéis Monolíticos (EPS)",
             descricao=(
-                "Serviço de instalação sobre a metragem linear de parede em painel monolítico (EPS) "
-                "identificada no projeto arquitetônico fornecido, conforme levantamento técnico descrito nesta proposta."
+                "Serviço de instalação sobre a área total calculada do projeto arquitetônico fornecido (m²), "
+                "conforme levantamento técnico e medição de área descritos nesta proposta."
             ),
             referencia_arquivo=uploaded_name
         )
@@ -485,9 +506,10 @@ def render_tab3():
             pdf_bytes = f.read()
 
         st.success(
-            f"🎉 Proposta gerada com sucesso! Metragem: **{budget.total_length_m:.2f} m** | "
+            f"🎉 Proposta gerada com sucesso! Área Total: **{budget.total_area_m2:.2f} m²** | "
             f"Valor Total: **{format_brl(budget.total_value)}**"
         )
+
 
         cli_filename = (st.session_state.get('cli_nome') or 'Cliente').replace(' ', '_')
         st.download_button(

@@ -186,6 +186,80 @@ def pair_wall_faces(segs, min_thickness=0.05, max_thickness=0.40,
     return centerlines, unpaired
 
 
+def compute_entity_area(entity):
+    """Calcula a área (m²) de uma entidade fechada (LWPOLYLINE, POLYLINE, HATCH, CIRCLE)."""
+    try:
+        t = entity.dxftype()
+        if t in ("LWPOLYLINE", "POLYLINE"):
+            pts = list(entity.get_points("xy"))
+            if len(pts) < 3:
+                return 0.0
+            is_closed = getattr(entity, "is_closed", False)
+            if not is_closed and hasattr(entity, "dxf") and hasattr(entity.dxf, "is_closed"):
+                is_closed = entity.dxf.is_closed
+            if not is_closed:
+                if math.dist(pts[0], pts[-1]) > 0.05:
+                    return 0.0
+            try:
+                import ezdxf.path
+                p = ezdxf.path.make_path(entity)
+                return abs(ezdxf.path.area(p))
+            except Exception:
+                n = len(pts)
+                area = 0.0
+                for i in range(n):
+                    j = (i + 1) % n
+                    area += pts[i][0] * pts[j][1] - pts[j][0] * pts[i][1]
+                return abs(area) / 2.0
+        elif t == "HATCH":
+            try:
+                import ezdxf.path
+                p = ezdxf.path.make_path(entity)
+                return abs(ezdxf.path.area(p))
+            except Exception:
+                if hasattr(entity, "get_area"):
+                    return abs(entity.get_area())
+        elif t == "CIRCLE":
+            r = entity.dxf.radius
+            return math.pi * (r ** 2)
+    except Exception:
+        pass
+    return 0.0
+
+
+def extract_layer_area(msp, layer_name):
+    """Calcula a área total em m² de entidades fechadas (LWPOLYLINE, POLYLINE, HATCH, CIRCLE) em uma camada."""
+    total_area = 0.0
+    closed_shapes_count = 0
+    for e in msp:
+        try:
+            if e.dxf.layer != layer_name:
+                continue
+        except Exception:
+            continue
+        area = compute_entity_area(e)
+        if area > 0.01:
+            total_area += area
+            closed_shapes_count += 1
+    return round(total_area, 2), closed_shapes_count
+
+
+def estimate_area_from_segments(segs):
+    """Estima a área ocupada pela envoltória dos segmentos caso não existam polígonos fechados."""
+    if not segs:
+        return 0.0
+    xs = []
+    ys = []
+    for s in segs:
+        xs.extend([s.x1, s.x2])
+        ys.extend([s.y1, s.y2])
+    min_x, max_x = min(xs), max(xs)
+    min_y, max_y = min(ys), max(ys)
+    width = max_x - min_x
+    height = max_y - min_y
+    return round(width * height * 0.75, 2)
+
+
 def summarize_layer(doc, layer_name, min_len=0.05):
     msp = doc.modelspace()
     segs = collect_segments(msp, layer_name)
@@ -197,6 +271,10 @@ def summarize_layer(doc, layer_name, min_len=0.05):
     paired_len = sum(c["length"] for c in centerlines)
     unpaired_len = sum(s.length for s in unpaired if s.length >= min_len)
 
+    area_m2, num_closed = extract_layer_area(msp, layer_name)
+    if area_m2 == 0.0 and segs:
+        area_m2 = estimate_area_from_segments(segs)
+
     return {
         "layer": layer_name,
         "paired_length_m": round(paired_len, 2),
@@ -207,14 +285,15 @@ def summarize_layer(doc, layer_name, min_len=0.05):
         "centerlines": centerlines,
         "unpaired": [s for s in unpaired if s.length >= min_len],
         "total_estimate_m": round(paired_len + unpaired_len + arcs_len, 2),
+        "area_m2": area_m2,
+        "num_closed_shapes": num_closed,
     }
 
 
 def detect_wall_layers(doc, keyword="parede"):
     """
     Detecta automaticamente camadas cujo nome contenha 'parede' (ou outra
-    palavra-chave), pra nao depender de nomes fixos de layer que variam de
-    escritorio pra escritorio.
+    palavra-chave), ou todas as camadas com geometria se nenhuma palavra-chave for encontrada.
     """
     kw = keyword.lower()
     names = set()
@@ -225,6 +304,14 @@ def detect_wall_layers(doc, keyword="parede"):
             continue
         if kw in ln.lower():
             names.add(ln)
+    if not names:
+        for e in doc.modelspace():
+            try:
+                ln = e.dxf.layer
+                if not ln.startswith("*") and ln != "0" and ln.upper() != "DEFPOINTS":
+                    names.add(ln)
+            except Exception:
+                continue
     return sorted(names)
 
 
@@ -232,6 +319,7 @@ def summarize_all_wall_layers(doc, keyword="parede"):
     """Roda summarize_layer em todas as camadas de parede detectadas."""
     layers = detect_wall_layers(doc, keyword)
     return {layer: summarize_layer(doc, layer) for layer in layers}
+
 
 
 def render_overlay_png(doc, layer_name, output_path, title=None, dpi=140):

@@ -241,7 +241,7 @@ def generate_proposal_pdf(output_path, company: Company, client: Client,
     c.rect(table_x, y - row_h, table_w, row_h, fill=1, stroke=0)
     c.setFillColor(white)
     c.setFont("Helvetica-Bold", 8.5)
-    headers = ["Pavimento", "Metragem de parede", "Valor / m", "Subtotal"]
+    headers = ["Pavimento / Camada", "Área Total (m²)", "Valor / m²", "Subtotal"]
     cx = table_x
     aligns = ["left", "right", "right", "right"]
     for h, w, al in zip(headers, col_widths, aligns):
@@ -253,12 +253,12 @@ def generate_proposal_pdf(output_path, company: Company, client: Client,
     y -= row_h
 
     c.setFont("Helvetica", 8.5)
-    for i, (name, meters, subtotal) in enumerate(budget.as_rows()):
+    for i, (name, area_m2, subtotal) in enumerate(budget.as_rows()):
         c.setFillColor(white if i % 2 == 0 else LIGHT_GRAY)
         c.rect(table_x, y - row_h, table_w, row_h, fill=1, stroke=0)
         c.setFillColor(CHARCOAL)
         cx = table_x
-        vals = [name, f"{meters:.2f} m", format_brl(budget.rate_per_meter), format_brl(subtotal)]
+        vals = [name, f"{area_m2:.2f} m²", format_brl(budget.rate_per_meter), format_brl(subtotal)]
         for v, w, al in zip(vals, col_widths, aligns):
             if al == "left":
                 c.drawString(cx + 3 * mm, y - row_h + 2.8 * mm, v)
@@ -277,11 +277,12 @@ def generate_proposal_pdf(output_path, company: Company, client: Client,
     c.setFillColor(white)
     c.setFont("Helvetica-Bold", 9.5)
     c.drawString(table_x + 3 * mm, y - total_h + 3.7 * mm,
-                 f"TOTAL — {budget.total_length_m:.2f} m de parede  x  {format_brl(budget.rate_per_meter)}/m")
+                 f"TOTAL — {budget.total_area_m2:.2f} m² de área total  x  {format_brl(budget.rate_per_meter)}/m²")
     c.setFont("Helvetica-Bold", 13)
     c.drawRightString(table_x + table_w - 3 * mm, y - total_h + 3.3 * mm,
                        format_brl(budget.total_value))
     y -= total_h + 9 * mm
+
 
     # ------------------------------------------------------- condicoes
     c.setFillColor(CHARCOAL)
