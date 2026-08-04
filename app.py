@@ -52,36 +52,31 @@ if "default_company" not in st.session_state:
 theme_color = st.session_state.theme_color
 
 # ----------------------------------------------------------------- Dynamic Custom CSS
-_css = """
+_css_tpl = """<div style="display:none">.</div>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
-
 html, body, [class*="css"] {
     font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
 }
-
 .stApp {
     background-color: #f8fafc;
     color: #0f172a;
 }
-
 .stButton>button[kind="primary"] {
-    background-color: """ + theme_color + """ !important;
+    background-color: THEME_COLOR !important;
     border: none !important;
     color: #ffffff !important;
     font-weight: 700 !important;
-    box-shadow: 0 4px 12px """ + theme_color + """33 !important;
+    box-shadow: 0 4px 12px THEME_COLOR33 !important;
     border-radius: 8px !important;
     transition: all 0.2s ease-in-out;
 }
-
 .stButton>button[kind="primary"]:hover {
     filter: brightness(0.9) !important;
     transform: translateY(-1px) !important;
 }
-</style>
-"""
-st.markdown(_css, unsafe_allow_html=True)
+</style>"""
+st.markdown(_css_tpl.replace("THEME_COLOR", theme_color), unsafe_allow_html=True)
 
 # ----------------------------------------------------------------- CNPJ Auto-Complete Helper
 def fetch_cnpj_data(cnpj: str) -> dict:
